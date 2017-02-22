@@ -16,11 +16,11 @@
 /////////////////////////////
 
 // 1次2次結合
+// トピックの文章が同じ場合省略
 // 開始時間順で並び替え
 // リンクをチェッカーページに固定
 // 特定の配信サイトを非表示　
 // トピック内のキーワードで非表示
-// 名前順で並び替え
 // 配信時間順で並び替え
 
 /////////////////////////////
@@ -214,7 +214,7 @@ $(window).ready(function () {
 		// 省略されていないトピックを取得
 		var topic = $(this).html().replace(/^<br>/g, "").replace(/<br>$/g, "");
 		// 反映
-		$(this).parent().html(topic); Date.ye
+		$(this).parent().html(topic);
 	});
 
 	// イベントバーを移動
@@ -655,6 +655,10 @@ function moveFavoriteRow(row) {
 		$(row).find("td.status a > img").attr("src", function () {
 			return $(this).attr("src").replace(/_s/g,"");
 		});
+		// 視聴者数
+		$(row).find(".viewers").html(
+			'<span class="viewersNum">' + $(row).find(".viewers").text() + '</span>'
+		);
 
 		// 適用
 		$(row).find("td.lastDate").html(dur + "<br>" + date);
@@ -799,7 +803,7 @@ function reorderAlphabetical() {
 
 	// 適用
 	$("#firstList tbody").html(header + favorite + online + offline + invisible);
-	console.log("alp");
+	//console.log("alp");
 }
 
 /**
@@ -807,14 +811,14 @@ function reorderAlphabetical() {
  */
 function reorderStartTime() {
 	// 開始時間順
-	console.log("sta");
+	//console.log("sta");
 }
 
 /**
  * テーブル並び替えを登録番号順にする
  */
 function reorderId(){
-	console.log("id");
+	//console.log("id");
 }
 
 /**
