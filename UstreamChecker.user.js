@@ -119,8 +119,7 @@ $(window).ready(function () {
 	// 非表示セクション
 	mwContent += '<div class="modal-item"><h3>部分非表示(チェックすると非表示)</h3><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="2nd_list_section"><label for="2nd_list_section">2次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="other_section"><label for="other_section">その他の情報</label></div><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="event_ticker"><label for="event_ticker">イベントティッカー</label></div><input type="button" class="button" id="disableSectionInitializeButton" value="初期化"></div>';
 	// ソート
-	mwContent += '<div class="modal-item"><h3>ソート順</h3><input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label><input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label></div>';
-	// <input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio"><s>配信開始時間順</s></label><input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio"><s>登録番号順</s></label>
+	mwContent += '<div class="modal-item"><h3>ソート順</h3><input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label><input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label><input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio">配信開始時間順</label><input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio">登録番号順</label></div>';
 
 	// 閉じるボタン
 	mwContent += '<input type="button" class="button" id="modal-close" value="閉じる" />';
@@ -194,7 +193,7 @@ $(window).ready(function () {
 		} else if (order == START_TIME_ORDER_NAME) {
 			$("#startTimeOrderRadio").prop("checked", true);
 			reorderStartTime();
-		} else if(order == ID_ORDER_NAME){
+		} else if (order == ID_ORDER_NAME) {
 			$("#idOrderRadio").prop("checked", true);
 			reorderId();
 		}
@@ -311,7 +310,7 @@ $(window).ready(function () {
 			} else if (getTableOrder() == START_TIME_ORDER_NAME) {
 				// 開始時間順
 				$("#startTimeOrderRadio").prop("checked", true);
-			} else if(getTableOrder() == ID_ORDER_NAME){
+			} else if (getTableOrder() == ID_ORDER_NAME) {
 				$("#idOrderRadio").prop("checked", true);
 			}
 		});
@@ -390,7 +389,7 @@ $(window).ready(function () {
 			} else if ($(this).attr("id") == "startTimeOrderRadio") {
 				setTableOrder(START_TIME_ORDER_NAME);
 				reorderStartTime();
-			} else if($(this).attr("id") == "startTimeOrderRadio"){
+			} else if ($(this).attr("id") == "idOrderRadio") {
 				setTableOrder(ID_ORDER_NAME);
 				reorderId();
 			}
@@ -653,7 +652,7 @@ function moveFavoriteRow(row) {
 		let date = $(row).find("span.date").prop('outerHTML');
 		// 配信サイトの画像を変更
 		$(row).find("td.status a > img").attr("src", function () {
-			return $(this).attr("src").replace(/_s/g,"");
+			return $(this).attr("src").replace(/_s/g, "");
 		});
 		// 視聴者数
 		$(row).find(".viewers").html(
@@ -702,7 +701,7 @@ function getTimeSinceEnd(date) {
 	// 現在時刻
 	let now = new Date();
 	// 先頭の波を削除
-	date = date.replace(/^~/, "");
+	date = date.replace(/^～/, "");
 	// 文字列から時間(秒)に変換
 	let time = (now.getTime() - new Date(now.getFullYear(), ("0" + date.match(/\d+/)).slice(-2) - 1, ("0" + date.match(/\d+(?=\s)/)).slice(-2), date.match(/\d+(?=:)/), date.match(/\d+$/), 0)) / 1000;
 	// ミリ秒から時間へ変換
@@ -782,11 +781,12 @@ function reorderAlphabetical() {
 	let header = $("#firstList tr").eq(0).prop('outerHTML');
 
 	// お気に入り
-	let favorite = getOuterHTML($("#firstList tr.favorite"));
-	favorite = $(favorite).sort(function (a, b) {
+	let favoriteOffline = getOuterHTML($("#firstList tr.favorite"));
+	let favoriteOnline = getOuterHTML($("#firstList tr.favorite.online"));
+	favoriteOnline = $(favoriteOnline).sort(function (a, b) {
 		return $(a).find("td.name > a[href]").text() < $(b).find("td.name > a[href]").text() ? -1 : 1;
 	});
-	favorite = getOuterHTML($(favorite));
+	let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
 
 	// オンライン
 	let online = getOuterHTML($("#firstList tr.online").not(".favorite"));
@@ -801,23 +801,98 @@ function reorderAlphabetical() {
 	// 非表示
 	let invisible = getOuterHTML($("#firstList tr.invisible"));
 
+	// 2次
+	let second = getOuterHTML($("#secondList tr.online"));
+	second = $(second).sort(function (a, b) {
+		return $(a).find("td.name > a[href]").text() < $(b).find("td.name > a[href]").text() ? -1 : 1;
+	});
+	second = getOuterHTML($(second));
+
 	// 適用
 	$("#firstList tbody").html(header + favorite + online + offline + invisible);
+	$("#secondList tbody").html(second);
 	//console.log("alp");
 }
 
 /**
  * テーブル並び替えを開始時間順にする
  */
-function reorderStartTime() {
-	// 開始時間順
+function reorderStartTime(date) {
+	// ヘッダ
+	let header = $("#firstList tr").eq(0).prop('outerHTML');
+
+	// お気に入り
+	let favoriteOffline = getOuterHTML($("#firstList tr.favorite.offline"));
+	let favoriteOnline = getOuterHTML($("#firstList tr.favorite.online"));
+	favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+		return getTimeAfterStarting($(a).find("span.date").text()) > getTimeAfterStarting($(b).find("span.date").text()) ? -1 : 1;
+	});
+	let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
+
+	//オンライン
+	let online = getOuterHTML($("#firstList tr.online").not(".favorite"));
+	online = $(online).sort(function (a, b) {
+		return getTimeAfterStarting($(a).find("span.date").text()) > getTimeAfterStarting($(b).find("span.date").text()) ? -1 : 1;
+	});
+	online = getOuterHTML($(online));
+
+	// オフライン
+	let offline = getOuterHTML($("#firstList tr.offline").not(".favorite"));
+
+	// 非表示
+	let invisible = getOuterHTML($("#firstList tr.invisible"));
+
+	// 2次
+	let second = getOuterHTML($("#secondList tr.online"));
+	second = $(second).sort(function (a, b) {
+		return getTimeAfterStarting($(a).find("span.date").text()) > getTimeAfterStarting($(b).find("span.date").text()) ? -1 : 1;
+	});
+	second = getOuterHTML($(second));
+
+	// 適用
+	$("#firstList tbody").html(header + favorite + online + offline + invisible);
+	$("#secondList tbody").html(second);
 	//console.log("sta");
 }
 
 /**
  * テーブル並び替えを登録番号順にする
  */
-function reorderId(){
+function reorderId() {
+	// ヘッダ
+	let header = $("#firstList tr").eq(0).prop('outerHTML');
+
+	// お気に入り
+	let favoriteOffline = getOuterHTML($("#firstList tr.favorite.offline"));;
+	let favoriteOnline = getOuterHTML($("#firstList tr.favorite.online"));
+	favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+		return getTimeAfterStarting($(a).find("span.date").text()) < getTimeAfterStarting($(b).find("span.date").text()) ? -1 : 1;
+	});
+	let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
+
+	//オンライン
+	let online = getOuterHTML($("#firstList tr.online").not(".favorite"));
+	online = $(online).sort(function (a, b) {
+		return Number($(a).find("td.log > a").attr("href").slice(14)) < Number($(b).find("td.log > a").attr("href").slice(14)) ? -1 : 1;
+	});
+	online = getOuterHTML($(online));
+
+	// オフライン
+	let offline = getOuterHTML($("#firstList tr.offline").not(".favorite"));
+
+	// 非表示
+	let invisible = getOuterHTML($("#firstList tr.invisible"));
+
+	// 2次
+	let second = getOuterHTML($("#secondList tr.online"));
+	second = $(second).sort(function (a, b) {
+		return Number($(a).find("td.log > a").attr("href").slice(14)) < Number($(b).find("td.log > a").attr("href").slice(14)) ? -1 : 1;
+	});
+	second = getOuterHTML($(second));
+
+	// 適用
+	$("#firstList tbody").html(header + favorite + online + offline + invisible);
+	$("#secondList tbody").html(second);
 	//console.log("id");
 }
 
@@ -835,6 +910,17 @@ function getOuterHTML(obj) {
 	});
 
 	return outerHTML;
+}
+
+function getTimeAfterStarting(date) {
+	// 現在時刻
+	let now = new Date();
+	// 先頭の波を削除
+	date = date.replace(/～$/, "");
+	// 文字列から時間(秒)に変換
+	let time = (new Date(now.getFullYear(), ("0" + date.match(/\d+/)).slice(-2) - 1, ("0" + date.match(/\d+(?=\s)/)).slice(-2), date.match(/\d+(?=:)/), date.match(/\d+$/), 0) - now.getTime()) / -1000;
+
+	return time;
 }
 
 /**
