@@ -203,6 +203,16 @@ $(window).ready(function () {
 	// そのほかの編集
 	/////////////////////////////
 
+	// サムネイル表示を変更
+	$('.popup').each(function () {
+		let a = $(this).find('a');
+		$(a).find('img').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\'');
+		$(a).find('img').eq(1).attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\'');
+		$(a).find('img.r').remove();
+		$(a).appendTo($(this).parent('td.status'));
+		$(this).remove();
+	});
+
 	// トピックを改行して表示
 	$("td.topic > img+img").before(function () {
 		$(this).before("<br>");
