@@ -211,8 +211,21 @@ $(window).ready(function () {
 	// サムネイル表示を変更
 	$('.popup').each(function () {
 		let a = $(this).find('a');
-		$(a).find('img').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\'');
-		$(a).find('img').eq(1).attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\'');
+		// 通常画像
+		$(a).find('img').not('[alt="beam"]').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\'').attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\'');
+		// videoタグ
+		$(a).find('video').hide().parent('a').hover(
+			function () {
+				$(this).find('video').show();
+				$(this).find('img').hide();
+			},
+			function () {
+				$(this).find('video').hide();
+				$(this).find('img').show();
+			}
+		);
+
+		// 適用
 		$(a).find('img.r').remove();
 		$(a).appendTo($(this).parent('td.status'));
 		$(this).remove();
