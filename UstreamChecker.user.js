@@ -4,11 +4,12 @@
 // @description UstreamChecker
 // @require     https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js
 // @include     http://revinx.net/ustream/
+// @include     https://revinx.net/ustream/
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
 // @run-attr	document-idle
-// @version     0.1.1
+// @version     0.1.2
 // ==/UserScript==
 
 /////////////////////////////
@@ -31,6 +32,7 @@ const DISABLE_LIST_DB_NAME = 'disable_list';
 const DISABLE_SECTION_DB_NAME = 'disable_section';
 const FAVORITE_LIST_DB_NAME = 'favorite_list';
 const TABLE_ORDER_DB_NAME = 'table_order';
+const THUMBNAIL_SETTING_DB_NAME = 'thumbnail_setting';
 
 // 非表示セクションDB用の名前
 const FIRST_LIST_SECTION_DB_NAME = '1st_list_section';
@@ -44,6 +46,11 @@ const FAVORITE_MARK_COLOR = 'rgb(255, 140, 0)';
 const FAVORITE_ROW_COLOR = 'rgb(255, 246, 202)';
 const UNDISABLE_MARK_COLOR = 'rgb(128, 128, 128)';
 const DISABLE_MARK_COLOR = 'rgb(255, 0, 0)';
+
+// サムネイル設定用の名前
+const THUMBNAIL_DEFAULT = 'default';
+const THUMBNAIL_MOUSE_OVER = 'mouse_over';
+const THUMBNAIL_ALLWAYS = 'allways';
 
 // テーブル並び替え用の名前
 const DEFAULT_ORDER_NAME = 'default';
@@ -59,6 +66,7 @@ let disableList = null;
 let disableSection = null;
 let FavoriteList = null;
 let TableOrder = null;
+let thumbnailSetting = null;
 
 $(window).ready(function () {
 	/////////////////////////////
@@ -117,11 +125,14 @@ $(window).ready(function () {
 	mwContent += '<div class="modal-item"><h3>非表示リスト</h3><textarea value="" id="disableListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" /><input type="button" class="button" id="disableListSaveButton" value="保存"><input type="button" class="button" id="disableListInitializeButton" value="初期化"></div>';
 	// 非表示セクション
 	mwContent += '<div class="modal-item"><h3>部分非表示(チェックすると非表示)</h3><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="2nd_list_section"><label for="2nd_list_section">2次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="other_section"><label for="other_section">その他の情報</label></div><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="event_ticker"><label for="event_ticker">イベントティッカー</label></div><input type="button" class="button" id="disableSectionInitializeButton" value="初期化"></div>';
-	// ソート
+	// ソート順
 	mwContent += '<div class="modal-item"><h3>ソート順</h3><input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label><input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label><input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio">配信開始時間順</label><input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio">登録番号順</label></div>';
+	// サムネイル設定
+	mwContent += '<div class="modal-item"><h3>サムネイル表示</h3><div class="modal-item thumbnailMode"><input type="radio" class="thumbnailCustomRadio" id="thumbnailDefault" name="thumbnailRadio"><label for="thumbnailDefault">デフォルト</label><input type="radio" class="thumbnailCustomRadio" id="thumbnailMouseOver" name="thumbnailRadio"><label for="thumbnailMouseOver">マウスオーバー</label><s><input type="radio" class="thumbnailCustomRadio" id="thumbnailAlways" name="thumbnailRadio"><label for="thumbnailAlways">常にサムネイルで表示する</label></s></div>' +
+		'<div class="modal-item thumbnailSize"><h4>画像の大きさ</h4><div class="thumbnailSample-item"><p id="sampleImageKeepAspect"><input type="checkbox" class="thumbnailRatioCheckbox" id="thumbnailAutoRatio"><label for="thumbnailAutoRatio">画像のアスペクト比を変更しない</label></p><p id="sampleImageWidth">横<input type="number" id="thumbnailWidth" value="50" min="50">px</p><p id="sampleImageHeight">縦<input type="number" id="thumbnailHeight" value="50" min="50">px</p></div><div class="thumbnailSample-item"><img id="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png"><figcaption>50px x 50px</figcaption></div></div></div>';
 
 	// 閉じるボタン
-	mwContent += '<input type="button" class="button" id="modal-close" value="閉じる" />';
+	mwContent += '<input type="button" class="button" id="modal-close" value="閉じる"/>';
 	mw.append(mwContent);
 
 	/////////////////////////////
@@ -129,8 +140,13 @@ $(window).ready(function () {
 	/////////////////////////////
 
 	// modal-window用CSS
-	GM_addStyle('.modal-content {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff;}' +
-		'.modal-item {border: medium solid #CCC; padding: 10px; border-radius: 10px; margin: 10px;}');
+	GM_addStyle(
+		'.modal-content {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff;}' +
+		'.modal-item {border: medium solid #CCC; padding: 10px; border-radius: 10px; margin: 10px;}' +
+		'.modal-item:after {clear: both; content: ""; display: table;}' +
+		'.thumbnailSample-item {float: left; text-align: center;}' +
+		'.thumbnailSample-item > * {margin: 2px;}' +
+		'input[type=number] {text-align: right;}');
 
 	// modal-overlay用CSS
 	GM_addStyle('.modal-overlay {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}');
@@ -204,32 +220,22 @@ $(window).ready(function () {
 		}
 	});
 
+	// サムネイル表示の反映
+	$(function () {
+		let ts = getThumbnailSetting();
+		applyThumbnailMode(ts.mode);
+
+		let style = '.thumbnail { width: ' + ts.width + 'px; ';
+		if (!ts.keepAspect) {
+			style += 'height: ' + ts.height + 'px; ';
+		}
+		style += '}';
+		GM_addStyle(style);
+	});
+
 	/////////////////////////////
 	// そのほかの編集
 	/////////////////////////////
-
-	// サムネイル表示を変更
-	$('.popup').each(function () {
-		let a = $(this).find('a');
-		// 通常画像
-		$(a).find('img').not('[alt="beam"]').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\'').attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\'');
-		// videoタグ
-		$(a).find('video').hide().parent('a').hover(
-			function () {
-				$(this).find('video').show();
-				$(this).find('img').hide();
-			},
-			function () {
-				$(this).find('video').hide();
-				$(this).find('img').show();
-			}
-		);
-
-		// 適用
-		$(a).find('img.r').remove();
-		$(a).appendTo($(this).parent('td.status'));
-		$(this).remove();
-	});
 
 	// トピックを改行して表示
 	$('td.topic > img+img').before(function () {
@@ -328,7 +334,7 @@ $(window).ready(function () {
 		$('#favoriteListText').val(getFavoriteList());
 		// テーブル並び替え順を表示
 		$(function () {
-			switch (getTimeAfterStarting()) {
+			switch (getTableOrder()) {
 				case DEFAULT_ORDER_NAME:
 					$('#defaultOrderRadio').prop('checked', true);
 					break;
@@ -342,6 +348,27 @@ $(window).ready(function () {
 					$('#idOrderRadio').prop('checked', true);
 					break;
 			}
+		});
+		// サムネイル設定を表示
+		$(function () {
+			let ts = getThumbnailSetting();
+
+			switch (ts.mode) {
+				case THUMBNAIL_DEFAULT:
+					$('#thumbnailDefault').prop('checked', true);
+					$('.thumbnailSize').hide();
+					break;
+				case THUMBNAIL_MOUSE_OVER:
+					$('#thumbnailMouseOver').prop('checked', true);
+					break;
+				case THUMBNAIL_ALLWAYS:
+					$('#thumbnailAlways').prop('checked', true);
+					break;
+			}
+			$('#thumbnailAutoRatio').prop('checked', ts.keepAspect);
+			$('#thumbnailWidth').val(ts.width);
+			$('#thumbnailHeight').val(ts.height);
+			setSampleImage(ts.keepAspect, ts.width, ts.height);
 		});
 
 		/////////////////////////////
@@ -430,6 +457,42 @@ $(window).ready(function () {
 					break;
 
 			}
+		});
+		// サムネイルモード切替
+		$('.thumbnailCustomRadio').on('change', function () {
+			let ts = getThumbnailSetting();
+			let tsMode = $(this).attr('id');
+			switch (tsMode) {
+				case $('#thumbnailDefault').attr('id'):
+					ts.mode = THUMBNAIL_DEFAULT;
+					break;
+				case $('#thumbnailMouseOver').attr('id'):
+					ts.mode = THUMBNAIL_MOUSE_OVER;
+					break;
+				case $('#thumbnailAlways').attr('id'):
+					ts.mode = THUMBNAIL_ALLWAYS;
+					break;
+			}
+			setThumbnailSetting(ts);
+		});
+		// サムネイルサイズアスペクト比保持
+		$('#thumbnailAutoRatio').on('change', function () {
+			let ts = getThumbnailSetting();
+			if ($(this).prop('checked')) {
+				ts.keepAspect = true;
+			} else {
+				ts.keepAspect = false;
+			}
+			setThumbnailSetting(ts);
+			setSampleImage(ts.keepAspect, ts.width, ts.height);
+		});
+		// サムネイルサイズ変更
+		$('#thumbnailWidth, #thumbnailHeight').on('change', function () {
+			let ts = getThumbnailSetting();
+			ts.width = Number($('#thumbnailWidth').val());
+			ts.height = Number($('#thumbnailHeight').val());
+
+			setSampleImage(ts.keepAspect, Number($('#thumbnailWidth').val()), Number($('#thumbnailHeight').val()));
 		});
 
 		// 「.modal-overlay」あるいは「.modal-close」をクリック
@@ -998,6 +1061,109 @@ function nameFromFavoriteButton(favoriteMark) {
 function deleteRow(button) {
 	$(button).parent().parent().remove();
 	// console.log($(button).prev().text().replace(/\r?\n/g,'') + ' delete');
+}
+
+/////////////////////////////
+// サムネイル設定
+/////////////////////////////
+
+/**
+ * サムネイル設定を初期化
+ */
+function initializeThumbnailSetting() {
+	if (confirm('サムネイル設定を初期化しますか？')) {
+		GM_setValue(THUMBNAIL_SETTING_DB_NAME, {
+			mode: THUMBNAIL_DEFAULT,
+			keepAspect: true,
+			width: 50,
+			height: 50,
+		});
+
+		thumbnailSetting = GM_getValue(THUMBNAIL_SETTING_DB_NAME);
+	}
+}
+
+/**
+ * サムネイル設定を取得
+ * @return {Object} サムネイル設定
+ */
+function getThumbnailSetting() {
+	if (thumbnailSetting == null) {
+		if (GM_getValue(THUMBNAIL_SETTING_DB_NAME) == undefined) {
+			initializeThumbnailSetting();
+		}
+
+		thumbnailSetting = GM_getValue(THUMBNAIL_SETTING_DB_NAME);
+	}
+
+	return thumbnailSetting;
+}
+
+/**
+ * サムネイル設定を保存
+ * @param {Object} setting サムネイル設定
+ */
+function setThumbnailSetting(setting) {
+	GM_setValue(THUMBNAIL_SETTING_DB_NAME, setting);
+}
+
+/**
+ * サムネイル表示方法を変更
+ * @param {string} mode モード
+ */
+function applyThumbnailMode(mode) {
+	switch (mode) {
+		case THUMBNAIL_DEFAULT:
+			break;
+		case THUMBNAIL_MOUSE_OVER:
+			// マウスオーバー
+			$('.popup').each(function () {
+				let a = $(this).find('a');
+				// 通常画像
+				$(a).find('img').not('[alt="beam"]').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\';this.className="thumbnail";').attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\';this.className="";');
+				// videoタグ
+				$(a).find('video').hide().parent('a').hover(
+					function () {
+						$(this).find('video').show();
+						$(this).find('img').hide();
+					},
+					function () {
+						$(this).find('video').hide();
+						$(this).find('img').show();
+					}
+				);
+
+				// 適用
+				$(a).find('img.r').remove();
+				$(a).appendTo($(this).parent('td.status'));
+				$(this).remove();
+			});
+			break;
+		case THUMBNAIL_ALLWAYS:
+			break;
+	}
+}
+
+/**
+ * サンプル画像を設定
+ * @param {boolean} keepAspect アスペクト比を保持するか
+ * @param {number} width 横
+ * @param {number} height 縦
+ */
+function setSampleImage(keepAspect, width, height) {
+	let ts = getThumbnailSetting();
+	ts.keepAspect = keepAspect;
+	ts.width = width;
+	ts.height = height;
+	setThumbnailSetting(ts);
+
+	if (ts.keepAspect) {
+		$('#thumbnailSampleImage').attr('width', ts.width).removeAttr('height').next().text(ts.width + 'px x ' + 'auto');
+		$('#sampleImageHeight').hide();
+	} else {
+		$('#thumbnailSampleImage').attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px x ' + ts.height + 'px');
+		$('#sampleImageHeight').show();
+	}
 }
 
 /////////////////////////////
