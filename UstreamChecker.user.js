@@ -9,7 +9,7 @@
 // @grant       GM_setValue
 // @grant       GM_addStyle
 // @run-attr	document-idle
-// @version     0.1.2
+// @version     0.1.3
 // ==/UserScript==
 
 /////////////////////////////
@@ -23,371 +23,312 @@
 // 特定の配信サイトを非表示
 // トピック内のキーワードで非表示
 
-/////////////////////////////
-// 定数
-/////////////////////////////
-
-// データベース用の名前
-const DISABLE_LIST_DB_NAME = 'disable_list';
-const DISABLE_SECTION_DB_NAME = 'disable_section';
-const FAVORITE_LIST_DB_NAME = 'favorite_list';
-const TABLE_ORDER_DB_NAME = 'table_order';
-const THUMBNAIL_SETTING_DB_NAME = 'thumbnail_setting';
-
-// 非表示セクションDB用の名前
-const FIRST_LIST_SECTION_DB_NAME = '1st_list_section';
-const SECOND_LIST_SECTION_DB_NAME = '2nd_list_section';
-const OTHER_SECTION_DB_NAME = 'other_section';
-const EVENT_TICKER_DB_NAME = 'event_ticker';
-
-// お気に入りマーク用の色
-const UNFAVORITE_MARK_COLOR = 'rgb(128, 128, 128)';
-const FAVORITE_MARK_COLOR = 'rgb(255, 140, 0)';
-const FAVORITE_ROW_COLOR = 'rgb(255, 246, 202)';
-const UNDISABLE_MARK_COLOR = 'rgb(128, 128, 128)';
-const DISABLE_MARK_COLOR = 'rgb(255, 0, 0)';
-
-// サムネイル設定用の名前
-const THUMBNAIL_DEFAULT = 'default';
-const THUMBNAIL_MOUSE_OVER = 'mouse_over';
-const THUMBNAIL_ALLWAYS = 'allways';
-
-// テーブル並び替え用の名前
-const DEFAULT_ORDER_NAME = 'default';
-const ALPHABETICAL_ORDER_NAME = 'alphabetical';
-const START_TIME_ORDER_NAME = 'startTime';
-const ID_ORDER_NAME = 'id';
-
-/////////////////////////////
-// 変数
-/////////////////////////////
-
-let disableList = null;
-let disableSection = null;
-let FavoriteList = null;
-let TableOrder = null;
-let thumbnailSetting = null;
-
-$(window).ready(function () {
+(function () {
+	'use strict';
 	/////////////////////////////
-	// ボタンの追加
+	// 定数
 	/////////////////////////////
 
-	// お気に入りボタンの追加
-	let buttonContent = '<a class="favoriteMark" title="お気に入り">★</a>';
-	// 非表示ボタンの追加
-	buttonContent += '<a class="disableButton" title="非表示">×</a>';
-	$('td.name > a').after(buttonContent);
+	/**
+	 * データベース用の名前
+	 */
+	const DB_NAMES = {
+		DISABLE_LIST: 'disable_list',
+		DISABLE_SECTION: 'disable_section',
+		FAVORITE_LIST: 'favorite_list',
+		TABLE_ORDER: 'table_order',
+		THUMBNAIL_SETTING: 'thumbnail_setting',
+		FIRST_LIST: '1st_list_section',
+		SECOND_LIST: '2nd_list_section',
+		OTHER: 'other_section',
+		EVENT_TICKER: 'event_ticker',
+	};
 
-	// デバッグボタン
-	// $('div#topMenuBar ul li:first-child').prepend('<input type="button" class="debug_button" value="デバッグ" />');
+	/**
+	 * 色
+	 */
+	const COLORS = {
+		UNFAVORITE_MARK: 'rgb(128, 128, 128)',
+		FAVORITE_MARK: 'rgb(255, 140, 0)',
+		FAVORITE_ROW: 'rgb(255, 246, 202)',
+		UNDISABLE_MARK: 'rgb(128, 128, 128)',
+		DISABLE_MARK: 'rgb(255, 0, 0)',
+	};
 
-	// その他の情報開閉トグルボタン
-	$('.noblk').last().before('<br><input type="button" id="otherToggleButton" value="その他の情報を格納" />');
-	// その他の情報をまとめる
-	$('#otherToggleButton').nextAll().wrapAll('<div id="otherToggle" />');
+	/**
+	 * サムネイル表示モード
+	 */
+	const THUMBNAIL_MODES = {
+		DEFAULT: 'default',
+		MOUSE_OVER: 'mouse_over',
+		ALLWAYS: 'allways',
+	};
 
-	/////////////////////////////
-	// ボタン用CSS
-	/////////////////////////////
-	GM_addStyle('.favoriteMark, .disableButton, .favoritedMark {cursor: pointer; margin: 2px; font-weight: bold;}' +
-		' .favoriteMark {color:' + UNFAVORITE_MARK_COLOR + '}' +
-		' .disableButton {color: ' + UNDISABLE_MARK_COLOR + '}' +
-		' .favoritedMark {color:' + FAVORITE_MARK_COLOR + ';}' +
-		' .favoriteMark:hover, .disableButton:hover, .favoritedMark:hover {font-size: 30px;}' +
-		' .favoriteMark:hover {color:' + FAVORITE_MARK_COLOR + ' !important;}' +
-		' .disableButton:hover {color:' + DISABLE_MARK_COLOR + ' !important;}' +
-		' .favoritedMark:hover {color:' + UNFAVORITE_MARK_COLOR + ' !important;}'
-	);
-
-	/////////////////////////////
-	// お気に入り用CSS
-	/////////////////////////////
-
-	GM_addStyle('tr.favorite > td {background-color: ' + FAVORITE_ROW_COLOR + ' !important;}');
-
-	/////////////////////////////
-	// モーダルウィンドウ
-	/////////////////////////////
-
-	// モーダルウィンドウボタン
-	$('#topMenuBar > ul').append('<li><a data-target="wm" class="modal-open" style="cursor: pointer;">拡張スクリプト設定</a></li>');
-
-	// モーダルウィンドウ本体
-	$('body').append('<div id="mw" class="modal-content"></div>');
-	let mw = $('div.modal-content');
-
-	// タイトル
-	let mwContent = '<h2>拡張スクリプト設定</h2>';
-	// お気に入りリスト
-	mwContent += '<div class="modal-item"><h3>お気に入りリスト</h3><textarea value="" id="favoriteListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" /><input type="button" class="button" id="favoriteListSaveButton" value="保存"><input type="button" class="button" id="favoriteListInitializeButton" value="初期化"></div>';
-	// 非表示リスト
-	mwContent += '<div class="modal-item"><h3>非表示リスト</h3><textarea value="" id="disableListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" /><input type="button" class="button" id="disableListSaveButton" value="保存"><input type="button" class="button" id="disableListInitializeButton" value="初期化"></div>';
-	// 非表示セクション
-	mwContent += '<div class="modal-item"><h3>部分非表示(チェックすると非表示)</h3><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="2nd_list_section"><label for="2nd_list_section">2次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="other_section"><label for="other_section">その他の情報</label></div><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="event_ticker"><label for="event_ticker">イベントティッカー</label></div><input type="button" class="button" id="disableSectionInitializeButton" value="初期化"></div>';
-	// ソート順
-	mwContent += '<div class="modal-item"><h3>ソート順</h3><input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label><input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label><input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio">配信開始時間順</label><input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio">登録番号順</label></div>';
-	// サムネイル設定
-	mwContent += '<div class="modal-item"><h3>サムネイル表示</h3><div class="modal-item thumbnailMode"><input type="radio" class="thumbnailCustomRadio" id="thumbnailDefault" name="thumbnailRadio"><label for="thumbnailDefault">デフォルト</label><input type="radio" class="thumbnailCustomRadio" id="thumbnailMouseOver" name="thumbnailRadio"><label for="thumbnailMouseOver">マウスオーバー</label><s><input type="radio" class="thumbnailCustomRadio" id="thumbnailAlways" name="thumbnailRadio"><label for="thumbnailAlways">常にサムネイルで表示する</label></s></div>' +
-		'<div class="modal-item thumbnailSize"><h4>画像の大きさ</h4><div class="thumbnailSample-item"><p id="sampleImageKeepAspect"><input type="checkbox" class="thumbnailRatioCheckbox" id="thumbnailAutoRatio"><label for="thumbnailAutoRatio">画像のアスペクト比を変更しない</label></p><p id="sampleImageWidth">横<input type="number" id="thumbnailWidth" value="50" min="50">px</p><p id="sampleImageHeight">縦<input type="number" id="thumbnailHeight" value="50" min="50">px</p></div><div class="thumbnailSample-item"><img id="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png"><figcaption>50px x 50px</figcaption></div></div></div>';
-
-	// 閉じるボタン
-	mwContent += '<input type="button" class="button" id="modal-close" value="閉じる"/>';
-	mw.append(mwContent);
+	/**
+	 * テーブル並び替え用の名前
+	 */
+	const TABLE_ORDERS = {
+		DEFAULT: 'default',
+		ALPHABETICAL: 'alphabetical',
+		START_TIME: 'startTime',
+		ID: 'id',
+	};
 
 	/////////////////////////////
-	// モーダルウィンドウ用CSS
+	// 変数
 	/////////////////////////////
 
-	// modal-window用CSS
-	GM_addStyle(
-		'.modal-content {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff;}' +
-		'.modal-item {border: medium solid #CCC; padding: 10px; border-radius: 10px; margin: 10px;}' +
-		'.modal-item:after {clear: both; content: ""; display: table;}' +
-		'.thumbnailSample-item {float: left; text-align: center;}' +
-		'.thumbnailSample-item > * {margin: 2px;}' +
-		'input[type=number] {text-align: right;}');
+	let disableList = null;
+	let disableSection = null;
+	let FavoriteList = null;
+	let TableOrder = null;
+	let thumbnailSetting = null;
 
-	// modal-overlay用CSS
-	GM_addStyle('.modal-overlay {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}');
-
-	// ボタン用CSS
-	GM_addStyle('.button {width: 100px; margin: 2px; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
-		'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
-		'.button:active {top: 3px; box-shadow: none;}');
-
-	/////////////////////////////
-	// 設定の反映
-	/////////////////////////////
-
-	// 非表示セクションの反映
-	$(function () {
-		let ds = getDisableSection();
-
-		if (ds[FIRST_LIST_SECTION_DB_NAME]) {
-			toggleSection(FIRST_LIST_SECTION_DB_NAME);
-		}
-		if (ds[SECOND_LIST_SECTION_DB_NAME]) {
-			toggleSection(SECOND_LIST_SECTION_DB_NAME);
-		}
-		if (ds[OTHER_SECTION_DB_NAME]) {
-			toggleSection(OTHER_SECTION_DB_NAME);
-		}
-		if (ds[EVENT_TICKER_DB_NAME]) {
-			toggleSection(EVENT_TICKER_DB_NAME);
-		}
-	});
-
-	// 非表示リストの反映
-	$('td.name > a[href]').each(function () {
-		let text = $(this).text().replace(/\r?\n/g, '');
-		let list = getDisableList();
-		if ($.inArray(text, list) != -1) {
-			deleteRow(this);
-		}
-		//console.log(this);
-	});
-
-	// お気に入りリストの反映
-	$('.favoriteMark').each(function () {
-		let button = nameFromFavoriteButton(this);
-		let list = getFavoriteList();
-		if ($.inArray(button, list) >= 0) {
-			// ★の色変更
-			$(this).removeClass('favoriteMark').addClass('favoritedMark');
-			moveFavoriteRow($(this).parent().parent());
-		}
-	});
-
-	// テーブルソートの反映
-	$(function () {
-		switch (getTableOrder()) {
-			case DEFAULT_ORDER_NAME:
-				$('#defaultOrderRadio').prop('checked', true);
-				break;
-			case ALPHABETICAL_ORDER_NAME:
-				$('#alphabeticalOrderRadio').prop('checked', true);
-				reorderAlphabetical();
-				break;
-			case START_TIME_ORDER_NAME:
-				$('#startTimeOrderRadio').prop('checked', true);
-				reorderStartTime();
-				break;
-			case ID_ORDER_NAME:
-				$('#idOrderRadio').prop('checked', true);
-				reorderId();
-				break;
-		}
-	});
-
-	// サムネイル表示の反映
-	$(function () {
-		let ts = getThumbnailSetting();
-		applyThumbnailMode(ts.mode);
-
-		let style = '.thumbnail { width: ' + ts.width + 'px; ';
-		if (!ts.keepAspect) {
-			style += 'height: ' + ts.height + 'px; ';
-		}
-		style += '}';
-		GM_addStyle(style);
-	});
-
-	/////////////////////////////
-	// そのほかの編集
-	/////////////////////////////
-
-	// トピックを改行して表示
-	$('td.topic > img+img').before(function () {
-		$(this).before('<br>');
-	});
-
-	// 省略されているトピックを復活
-	$('p.arrow_box').each(function () {
-		// 省略されていないトピックを取得
-		let topic = $(this).html().replace(/^<br>/g, '').replace(/<br>$/g, '');
-		// 反映
-		$(this).parent().html(topic);
-	});
-
-	// イベントバーを移動
-	$('.ticker').insertBefore('.noblk:first');
-
-	/////////////////////////////
-	// ボタンイベント
-	/////////////////////////////
-
-	// 非表示ボタン
-	$('.disableButton').on('click', function () {
-		if (confirm('[' + nameFromDisableButton($(this)) + ']を非表示にしますか？')) {
-			// OK
-			addDisableList(nameFromDisableButton($(this)));
-			deleteRow(this);
-		} else {
-			// cancel
-			//console.log('canceled add disable list');
-		}
-	});
-
-	// お気に入りボタン
-	$(document).on('click', '.favoriteMark', function () {
-		// リストにない
-		addFavoriteList(nameFromFavoriteButton(this));
-		$(this).removeClass('favoriteMark').addClass('favoritedMark');
-		// お気に入りへ移動
-		moveFavoriteRow($(this).parent().parent());
-	});
-	// お気に入り解除ボタン
-	$(document).on('click', '.favoritedMark', function () {
-		let index = $.inArray(nameFromFavoriteButton(this), getFavoriteList());
-		// リストから削除
-		removeFavoriteList(index);
-		// マーク変更
-		$(this).removeClass('favoritedMark').addClass('favoriteMark');
-		// お気に入り外へ移動
-		removeFavoriteRow($(this).parent().parent());
-	});
-
-	// その他欄の非表示トグルボタン
-	$('#otherToggleButton').on('click', function () {
-		toggleSection(OTHER_SECTION_DB_NAME);
-	});
-
-	/////////////////////////////
-	// 設定ウィンドウ
-	/////////////////////////////
-
-	// 「.modal-open」をクリック
-	$('.modal-open').on('click', function () {
-		// オーバーレイ用の要素を追加
-		$('body').append('<div class="modal-overlay"></div>');
-		// モーダルコンテンツのIDを取得
-		let modal = $('#mw');
-		let modalOverlay = $('.modal-overlay');
-		// オーバーレイをフェードイン
-		modalOverlay.fadeIn('slow');
-		// モーダルコンテンツの表示位置を設定
-		modalResize();
-		// モーダルコンテンツフェードイン
-		modal.fadeIn('slow');
-
+	$(window).load(function () {
+		let startTime = new Date().getTime();
 		/////////////////////////////
-		// 設定ウィンドウに設定内容を表示
+		// ボタンの追加
 		/////////////////////////////
 
-		// 非表示リストを表示
-		$('#disableListText').val(getDisableList());
-		// 非表示セクションを反映
-		$('.disableSectionCheckbox').each(function () {
-			let key = $(this).attr('id');
-			let ds = getDisableSection();
+		// お気に入りボタンの追加
+		let buttonContent = '<a class="favoriteMark" title="お気に入り">★</a>';
+		// 非表示ボタンの追加
+		buttonContent += '<a class="disableButton" title="非表示">×</a>';
+		$('td.name > a').after(buttonContent);
 
-			if (ds[key]) {
-				// チェックあり
-				$(this).prop('checked', true);
-			} else {
-				// チェックなし
-				$(this).prop('checked', false);
+		// デバッグボタン
+		// $('div#topMenuBar ul li:first-child').prepend('<input type="button" class="debug_button" value="デバッグ" />');
+
+		// その他の情報開閉トグルボタン
+		$('.noblk').last().before('<br><input type="button" id="otherToggleButton" value="その他の情報を格納" />');
+		// その他の情報をまとめる
+		$('#otherToggleButton').nextAll().wrapAll('<div id="otherToggle" />');
+
+		/////////////////////////////
+		// ボタン用CSS
+		/////////////////////////////
+		let addCSS = '.favoriteMark, .disableButton, .favoritedMark {cursor: pointer; margin: 2px; font-weight: bold;}' +
+			' .favoriteMark {color:' + COLORS.UNFAVORITE_MARK + '}' +
+			' .disableButton {color: ' + COLORS.UNDISABLE_MARK + '}' +
+			' .favoritedMark {color:' + COLORS.FAVORITE_MARK + ';}' +
+			' .favoriteMark:hover, .disableButton:hover, .favoritedMark:hover {font-size: 30px;}' +
+			' .favoriteMark:hover {color:' + COLORS.FAVORITE_MARK + ' !important;}' +
+			' .disableButton:hover {color:' + COLORS.DISABLE_MARK + ' !important;}' +
+			' .favoritedMark:hover {color:' + COLORS.UNFAVORITE_MARK + ' !important;}';
+
+		/////////////////////////////
+		// お気に入り用CSS
+		/////////////////////////////
+
+		addCSS += 'tr.favorite > td {background-color: ' + COLORS.FAVORITE_ROW + ' !important;}';
+
+		/////////////////////////////
+		// モーダルウィンドウ
+		/////////////////////////////
+
+		// モーダルウィンドウボタン
+		$('#topMenuBar > ul').append('<li><a data-target="wm" class="modal-open" style="cursor: pointer;">拡張スクリプト設定</a></li>');
+
+		// モーダルウィンドウ本体
+		$('body').append('<div id="mw" class="modal-content"></div>');
+		let mw = $('div.modal-content');
+
+		// タイトル
+		let mwContent = '<h2>拡張スクリプト設定</h2>';
+		// お気に入りリスト
+		mwContent += '<div class="modal-item"><h3>お気に入りリスト</h3><textarea value="" id="favoriteListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" /><input type="button" class="button" id="favoriteListSaveButton" value="保存"><input type="button" class="button" id="favoriteListInitializeButton" value="初期化"></div>';
+		// 非表示リスト
+		mwContent += '<div class="modal-item"><h3>非表示リスト</h3><textarea value="" id="disableListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" /><input type="button" class="button" id="disableListSaveButton" value="保存"><input type="button" class="button" id="disableListInitializeButton" value="初期化"></div>';
+		// 非表示セクション
+		mwContent += '<div class="modal-item"><h3>部分非表示(チェックすると非表示)</h3><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="2nd_list_section"><label for="2nd_list_section">2次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="other_section"><label for="other_section">その他の情報</label></div><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="event_ticker"><label for="event_ticker">イベントティッカー</label></div><input type="button" class="button" id="disableSectionInitializeButton" value="初期化"></div>';
+		// ソート順
+		mwContent += '<div class="modal-item"><h3>ソート順</h3><input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label><input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label><input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio">配信開始時間順</label><input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio">登録番号順</label></div>';
+		// サムネイル設定
+		mwContent +=
+			'<div class="modal-item"><h3>サムネイル表示</h3><div class="modal-item thumbnailMode"><input type="radio" class="thumbnailCustomRadio" id="thumbnailDefault" name="thumbnailRadio"><label for="thumbnailDefault">デフォルト</label><input type="radio" class="thumbnailCustomRadio" id="thumbnailMouseOver" name="thumbnailRadio"><label for="thumbnailMouseOver">マウスオーバー</label><s><input type="radio" class="thumbnailCustomRadio" id="thumbnailAlways" name="thumbnailRadio"><label for="thumbnailAlways">常にサムネイルで表示する</label></s></div>' +
+			'<div class="modal-item thumbnailSize"><h4>画像の大きさ</h4><div class="thumbnailSample-item"><p id="sampleImageKeepAspect"><input type="checkbox" class="thumbnailRatioCheckbox" id="thumbnailAutoRatio"><label for="thumbnailAutoRatio">画像のアスペクト比を変更しない</label></p><p id="sampleImageWidth">横<input type="number" id="thumbnailWidth" value="50" min="50">px</p><p id="sampleImageHeight">縦<input type="number" id="thumbnailHeight" value="50" min="50">px</p></div><div class="thumbnailSample-item"><img id="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png"><figcaption>50px x 50px</figcaption></div></div></div>';
+
+		// 閉じるボタン
+		mwContent += '<input type="button" class="button" id="modal-close" value="閉じる"/>';
+		mw.append(mwContent);
+
+		/////////////////////////////
+		// モーダルウィンドウ用CSS
+		/////////////////////////////
+
+		// modal-window用CSS
+		addCSS += '.modal-content {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff;}' +
+			'.modal-item {border: medium solid #CCC; padding: 10px; border-radius: 10px; margin: 10px;}' +
+			'.modal-item:after {clear: both; content: ""; display: table;}' +
+			'.thumbnailSample-item {float: left; text-align: center;}' +
+			'.thumbnailSample-item > * {margin: 2px;}' +
+			'input[type=number] {text-align: right;}';
+
+		// modal-overlay用CSS
+		addCSS += '.modal-overlay {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}';
+
+		// ボタン用CSS
+		addCSS += '.button {width: 100px; margin: 2px; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
+			'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
+			'.button:active {top: 3px; box-shadow: none;}';
+
+		GM_addStyle(addCSS);
+		/////////////////////////////
+		// 設定の反映
+		/////////////////////////////
+
+		// 非表示セクションの反映
+		updateDisableSection();
+
+		// 非表示リストの反映
+		$('td.name > a[href]').each(function () {
+			let text = $(this).text().replace(/\r?\n/g, '');
+			let list = getDisableList();
+			if ($.inArray(text, list) != -1) {
+				deleteRow(this);
 			}
 		});
-		// お気に入りリストを表示
-		$('#favoriteListText').val(getFavoriteList());
-		// テーブル並び替え順を表示
+
+		// お気に入りリストの反映
+		$('.favoriteMark').each(function () {
+			let button = nameFromFavoriteButton(this);
+			let list = getFavoriteList();
+			if ($.inArray(button, list) >= 0) {
+				// ★の色変更
+				$(this).removeClass('favoriteMark').addClass('favoritedMark');
+				moveFavoriteRow($(this).parent().parent());
+			}
+		});
+
+		// テーブルソートの反映
 		$(function () {
 			switch (getTableOrder()) {
-				case DEFAULT_ORDER_NAME:
+				case TABLE_ORDERS.DEFAULT:
 					$('#defaultOrderRadio').prop('checked', true);
 					break;
-				case ALPHABETICAL_ORDER_NAME:
+				case TABLE_ORDERS.ALPHABETICAL:
 					$('#alphabeticalOrderRadio').prop('checked', true);
+					reorderAlphabetical();
 					break;
-				case START_TIME_ORDER_NAME:
+				case TABLE_ORDERS.START_TIME:
 					$('#startTimeOrderRadio').prop('checked', true);
+					reorderStartTime();
 					break;
-				case ID_ORDER_NAME:
+				case TABLE_ORDERS.ID:
 					$('#idOrderRadio').prop('checked', true);
+					reorderId();
 					break;
 			}
 		});
-		// サムネイル設定を表示
+
+		// サムネイル表示の反映
 		$(function () {
 			let ts = getThumbnailSetting();
+			applyThumbnailMode(ts.mode);
 
-			switch (ts.mode) {
-				case THUMBNAIL_DEFAULT:
-					$('#thumbnailDefault').prop('checked', true);
-					$('.thumbnailSize').hide();
-					break;
-				case THUMBNAIL_MOUSE_OVER:
-					$('#thumbnailMouseOver').prop('checked', true);
-					break;
-				case THUMBNAIL_ALLWAYS:
-					$('#thumbnailAlways').prop('checked', true);
-					break;
+			// 横指定
+			let style = '.thumbnail { width: ' + ts.width + 'px; ';
+			if (!ts.keepAspect) {
+				// 縦指定
+				style += 'height: ' + ts.height + 'px; ';
 			}
-			$('#thumbnailAutoRatio').prop('checked', ts.keepAspect);
-			$('#thumbnailWidth').val(ts.width);
-			$('#thumbnailHeight').val(ts.height);
-			setSampleImage(ts.keepAspect, ts.width, ts.height);
+			style += '}';
+			GM_addStyle(style);
 		});
 
 		/////////////////////////////
-		// 設定ウィンドウ内の初期化ボタン
+		// そのほかの編集
 		/////////////////////////////
 
-		// 非表示リストを初期化ボタン
-		$('#disableListInitializeButton').on('click', function () {
-			initializeDisableListDB();
-			$('disableListText').val(getDisableList());
+		// トピックを改行して表示
+		$('td.topic > img+img').before(function () {
+			$(this).before('<br>');
 		});
-		// お気に入りリストを初期化
-		$('#favoriteListInitializeButton').on('click', function () {
-			initializeFavoriteListDB();
-			$('#favoriteListText').val(getFavoriteList());
+
+		// 省略されているトピックを復活
+		$('p.arrow_box').each(function () {
+			// 省略されていないトピックを取得
+			let topic = $(this).html().replace(/^<br>/g, '').replace(/<br>$/g, '');
+			// 反映
+			$(this).parent().html(topic);
 		});
-		// 非表示セクションリストを初期化
-		$('#disableSectionInitializeButton').on('click', function () {
-			initializeDisableSectionDB();
+
+		// ニコ生リンク修正
+		$('td.status img[alt="nico"]').each(function () {
+			let url = $(this).parent('a').attr('href').substring(0, 32) +
+				$(this).closest('.status').nextAll('.archives').find('img[alt="nico"]').parent().attr('href').split('?')[0].substr(38);
+
+			$(this).parent('a').attr('href', url);
+		});
+
+		// イベントバーを移動
+		$('.ticker').insertBefore('.noblk:first');
+
+		/////////////////////////////
+		// ボタンイベント
+		/////////////////////////////
+
+		// 非表示ボタン
+		$('.disableButton').on('click', function () {
+			if (confirm('[' + nameFromDisableButton($(this)) + ']を非表示にしますか？')) {
+				// OK
+				addDisableList(nameFromDisableButton($(this)));
+				deleteRow(this);
+			} else {
+				// cancel
+				//console.log('canceled add disable list');
+			}
+		});
+
+		// お気に入りボタン
+		$(document).on('click', '.favoriteMark', function () {
+			// リストにない
+			addFavoriteList(nameFromFavoriteButton(this));
+			$(this).removeClass('favoriteMark').addClass('favoritedMark');
+			// お気に入りへ移動
+			moveFavoriteRow($(this).parent().parent());
+		});
+		// お気に入り解除ボタン
+		$(document).on('click', '.favoritedMark', function () {
+			let index = $.inArray(nameFromFavoriteButton(this), getFavoriteList());
+			// リストから削除
+			removeFavoriteList(index);
+			// マーク変更
+			$(this).removeClass('favoritedMark').addClass('favoriteMark');
+			// お気に入り外へ移動
+			removeFavoriteRow($(this).parent().parent());
+		});
+
+		// その他欄の非表示トグルボタン
+		$('#otherToggleButton').on('click', function () {
+			toggleSection(DB_NAMES.OTHER_SECTION);
+		});
+
+		/////////////////////////////
+		// 設定ウィンドウ
+		/////////////////////////////
+
+		// 「.modal-open」をクリック
+		$('.modal-open').on('click', function () {
+			// オーバーレイ用の要素を追加
+			$('body').append('<div class="modal-overlay"></div>');
+			// モーダルコンテンツのIDを取得
+			let modal = $('#mw');
+			let modalOverlay = $('.modal-overlay');
+			// オーバーレイをフェードイン
+			modalOverlay.fadeIn('slow');
+			// モーダルコンテンツの表示位置を設定
+			modalResize();
+			// モーダルコンテンツフェードイン
+			modal.fadeIn('slow');
+
+			/////////////////////////////
+			// 設定ウィンドウに設定内容を表示
+			/////////////////////////////
+
+			// 非表示リストを表示
+			$('#disableListText').val(getDisableList());
+			// 非表示セクションを反映
 			$('.disableSectionCheckbox').each(function () {
 				let key = $(this).attr('id');
 				let ds = getDisableSection();
@@ -400,777 +341,869 @@ $(window).ready(function () {
 					$(this).prop('checked', false);
 				}
 			});
-		});
-
-		/////////////////////////////
-		// 設定ウィンドウ内の保存ボタン
-		/////////////////////////////
-
-		// 非表示リストを保存ボタン
-		$('#disableListSaveButton').on('click', function () {
-			if (confirm('非表示リストを保存しますか？')) {
-				// OK
-				let dlist = $('#disableListText').val().split(',');
-				setDisableList(dlist);
-			}
-		});
-		// 非表示セクションのチェックボックス
-		$('.disableSectionCheckbox').on('change', function () {
-			let id = $(this).attr('id');
-
-			if ($(this).is(':checked')) {
-				// チェックしたら
-				setDisableSection(id, true);
-			} else {
-				// チェックはずれたら
-				setDisableSection(id, false);
-			}
-		});
-		// お気に入りリストを保存ボタン
-		$('#favoriteListSaveButton').on('click', function () {
-			if (confirm('お気に入りリストを保存しますか？')) {
-				// OK
-				let flist = $('#favoriteListText').val().split(',');
-				setFavoriteList(flist);
-			}
-		});
-		// テーブル並び替え切り替え
-		$('.orderRadio').on('change', function () {
-			let id = $(this).attr('id');
-
-			switch (id) {
-				case 'defaultOrderRadio':
-					setTableOrder(DEFAULT_ORDER_NAME);
-					reorderDefault();
-					break;
-				case 'alphabeticalOrderRadio':
-					setTableOrder(ALPHABETICAL_ORDER_NAME);
-					reorderAlphabetical();
-					break;
-				case 'startTimeOrderRadio':
-					setTableOrder(START_TIME_ORDER_NAME);
-					reorderStartTime();
-					break;
-				case 'idOrderRadio':
-					setTableOrder(ID_ORDER_NAME);
-					reorderId();
-					break;
-
-			}
-		});
-		// サムネイルモード切替
-		$('.thumbnailCustomRadio').on('change', function () {
-			let ts = getThumbnailSetting();
-			let tsMode = $(this).attr('id');
-			switch (tsMode) {
-				case $('#thumbnailDefault').attr('id'):
-					ts.mode = THUMBNAIL_DEFAULT;
-					break;
-				case $('#thumbnailMouseOver').attr('id'):
-					ts.mode = THUMBNAIL_MOUSE_OVER;
-					break;
-				case $('#thumbnailAlways').attr('id'):
-					ts.mode = THUMBNAIL_ALLWAYS;
-					break;
-			}
-			setThumbnailSetting(ts);
-		});
-		// サムネイルサイズアスペクト比保持
-		$('#thumbnailAutoRatio').on('change', function () {
-			let ts = getThumbnailSetting();
-			if ($(this).prop('checked')) {
-				ts.keepAspect = true;
-			} else {
-				ts.keepAspect = false;
-			}
-			setThumbnailSetting(ts);
-			setSampleImage(ts.keepAspect, ts.width, ts.height);
-		});
-		// サムネイルサイズ変更
-		$('#thumbnailWidth, #thumbnailHeight').on('change', function () {
-			let ts = getThumbnailSetting();
-			ts.width = Number($('#thumbnailWidth').val());
-			ts.height = Number($('#thumbnailHeight').val());
-
-			setSampleImage(ts.keepAspect, Number($('#thumbnailWidth').val()), Number($('#thumbnailHeight').val()));
-		});
-
-		// 「.modal-overlay」あるいは「.modal-close」をクリック
-		$('.modal-overlay, #modal-close').off().on('click', function () {
-			// モーダルコンテンツとオーバーレイをフェードアウト
-			modal.fadeOut('slow');
-			modalOverlay.fadeOut('slow', function () {
-				// オーバーレイを削除
-				modalOverlay.remove();
+			// お気に入りリストを表示
+			$('#favoriteListText').val(getFavoriteList());
+			// テーブル並び替え順を表示
+			$(function () {
+				switch (getTableOrder()) {
+					case TABLE_ORDERS.DEFAULT:
+						$('#defaultOrderRadio').prop('checked', true);
+						break;
+					case TABLE_ORDERS.ALPHABETICAL:
+						$('#alphabeticalOrderRadio').prop('checked', true);
+						break;
+					case TABLE_ORDERS.START_TIME:
+						$('#startTimeOrderRadio').prop('checked', true);
+						break;
+					case TABLE_ORDERS.ID:
+						$('#idOrderRadio').prop('checked', true);
+						break;
+				}
 			});
-		});
+			// サムネイル設定を表示
+			$(function () {
+				let ts = getThumbnailSetting();
 
-		// リサイズしたら表示位置を再取得
-		$(window).on('resize', function () {
-			modalResize();
-		});
-
-		/**
-		 * モーダルコンテンツの表示位置を設定する関数
-		 */
-		function modalResize() {
-			// モーダルコンテンツの表示位置を取得
-			let x = ($(window).width() - modal.outerWidth(true)) / 2;
-			let y = 50; //($(window).height() - modal.outerHeight(true)) / 2;
-
-			// モーダルコンテンツの表示位置を設定
-			modal.css({
-				'left': x + 'px', 'top': y + 'px',
+				switch (ts.mode) {
+					case THUMBNAIL_MODES.DEFAULT:
+						$('#thumbnailDefault').prop('checked', true);
+						$('.thumbnailSize').hide();
+						break;
+					case THUMBNAIL_MODES.MOUSE_OVER:
+						$('#thumbnailMouseOver').prop('checked', true);
+						break;
+					case THUMBNAIL_MODES.ALLWAYS:
+						$('#thumbnailAlways').prop('checked', true);
+						break;
+				}
+				$('#thumbnailAutoRatio').prop('checked', ts.keepAspect);
+				$('#thumbnailWidth').val(ts.width);
+				$('#thumbnailHeight').val(ts.height);
+				setSampleImage(ts.keepAspect, ts.width, ts.height);
+				// サンプル画像を設定
+				$('#thumbnailSampleImage').attr('src', $('img[onmouseover]').first().attr('onmouseover').split('\'')[1]);
 			});
-		}
+
+			/////////////////////////////
+			// 設定ウィンドウ内の初期化ボタン
+			/////////////////////////////
+
+			// 非表示リストを初期化ボタン
+			$('#disableListInitializeButton').on('click', function () {
+				initializeDisableListDB();
+				$('disableListText').val(getDisableList());
+			});
+			// お気に入りリストを初期化
+			$('#favoriteListInitializeButton').on('click', function () {
+				initializeFavoriteListDB();
+				$('#favoriteListText').val(getFavoriteList());
+			});
+			// 非表示セクションリストを初期化
+			$('#disableSectionInitializeButton').on('click', function () {
+				initializeDisableSectionDB();
+				$('.disableSectionCheckbox').each(function () {
+					let key = $(this).attr('id');
+					let ds = getDisableSection();
+
+					if (ds[key]) {
+						// チェックあり
+						$(this).prop('checked', true);
+					} else {
+						// チェックなし
+						$(this).prop('checked', false);
+					}
+				});
+			});
+
+			/////////////////////////////
+			// 設定ウィンドウ内の保存ボタン
+			/////////////////////////////
+
+			// 非表示リストを保存ボタン
+			$('#disableListSaveButton').on('click', function () {
+				if (confirm('非表示リストを保存しますか？')) {
+					// OK
+					let dlist = $('#disableListText').val().split(',');
+					setDisableList(dlist);
+				}
+			});
+			// 非表示セクションのチェックボックス
+			$('.disableSectionCheckbox').on('change', function () {
+				let id = $(this).attr('id');
+
+				if ($(this).is(':checked')) {
+					// チェックしたら
+					setDisableSection(id, true);
+				} else {
+					// チェックはずれたら
+					setDisableSection(id, false);
+				}
+			});
+			// お気に入りリストを保存ボタン
+			$('#favoriteListSaveButton').on('click', function () {
+				if (confirm('お気に入りリストを保存しますか？')) {
+					// OK
+					let flist = $('#favoriteListText').val().split(',');
+					setFavoriteList(flist);
+				}
+			});
+			// テーブル並び替え切り替え
+			$('.orderRadio').on('change', function () {
+				let id = $(this).attr('id');
+
+				switch (id) {
+					case 'defaultOrderRadio':
+						setTableOrder(TABLE_ORDERS.DEFAULT);
+						reorderDefault();
+						break;
+					case 'alphabeticalOrderRadio':
+						setTableOrder(TABLE_ORDERS.ALPHABETICAL);
+						reorderAlphabetical();
+						break;
+					case 'startTimeOrderRadio':
+						setTableOrder(TABLE_ORDERS.START_TIME);
+						reorderStartTime();
+						break;
+					case 'idOrderRadio':
+						setTableOrder(TABLE_ORDERS.ID);
+						reorderId();
+						break;
+
+				}
+			});
+			// サムネイルモード切替
+			$('.thumbnailCustomRadio').on('change', function () {
+				let ts = getThumbnailSetting();
+				let tsMode = $(this).attr('id');
+				switch (tsMode) {
+					case $('#thumbnailDefault').attr('id'):
+						ts.mode = THUMBNAIL_MODES.DEFAULT;
+						break;
+					case $('#thumbnailMouseOver').attr('id'):
+						ts.mode = THUMBNAIL_MODES.MOUSE_OVER;
+						break;
+					case $('#thumbnailAlways').attr('id'):
+						ts.mode = THUMBNAIL_MODES.ALLWAYS;
+						break;
+				}
+				setThumbnailSetting(ts);
+			});
+			// サムネイルサイズアスペクト比保持
+			$('#thumbnailAutoRatio').on('change', function () {
+				let ts = getThumbnailSetting();
+				if ($(this).prop('checked')) {
+					ts.keepAspect = true;
+				} else {
+					ts.keepAspect = false;
+				}
+				setThumbnailSetting(ts);
+				setSampleImage(ts.keepAspect, ts.width, ts.height);
+			});
+			// サムネイルサイズ変更
+			$('#thumbnailWidth, #thumbnailHeight').on('change', function () {
+				let ts = getThumbnailSetting();
+				ts.width = Number($('#thumbnailWidth').val());
+				ts.height = Number($('#thumbnailHeight').val());
+
+				setSampleImage(ts.keepAspect, Number($('#thumbnailWidth').val()), Number($('#thumbnailHeight').val()));
+			});
+
+			// 「.modal-overlay」あるいは「.modal-close」をクリック
+			$('.modal-overlay, #modal-close').off().on('click', function () {
+				// モーダルコンテンツとオーバーレイをフェードアウト
+				modal.fadeOut('slow');
+				modalOverlay.fadeOut('slow', function () {
+					// オーバーレイを削除
+					modalOverlay.remove();
+				});
+			});
+
+			// リサイズしたら表示位置を再取得
+			$(window).on('resize', function () {
+				modalResize();
+			});
+
+			/**
+			 * モーダルコンテンツの表示位置を設定する関数
+			 */
+			function modalResize() {
+				// モーダルコンテンツの表示位置を取得
+				let x = ($(window).width() - modal.outerWidth(true)) / 2;
+				let y = 50; //($(window).height() - modal.outerHeight(true)) / 2;
+
+				// モーダルコンテンツの表示位置を設定
+				modal.css({
+					'left': x + 'px', 'top': y + 'px',
+				});
+			}
+		});
+		let ms = new Date().getTime() - startTime;
+		console.log('time -> ' + ms);
 	});
-});
 
-/////////////////////////////
-// 非表示リスト
-/////////////////////////////
+	/////////////////////////////
+	// 非表示リスト
+	/////////////////////////////
 
-/**
- * 非表示リストを初期化
- */
-function initializeDisableListDB() {
-	if (confirm('非表示リストを初期化しますか？')) {
-		GM_setValue(DISABLE_LIST_DB_NAME, []);
-		disableList = GM_getValue(DISABLE_LIST_DB_NAME);
-		//console.log(DISABLE_LIST_DB_NAME + ' initialize');
-	} else {
-		//console.log(DISABLE_LIST_DB_NAME + ' initialize canceled');
+	/**
+	 * 非表示リストを初期化
+	 */
+	function initializeDisableListDB() {
+		if (confirm('非表示リストを初期化しますか？')) {
+			GM_setValue(DB_NAMES.DISABLE_LIST, []);
+			disableList = GM_getValue(DB_NAMES.DISABLE_LIST);
+			//console.log(DISABLE_LIST_DB_NAME + ' initialize');
+		} else {
+			//console.log(DISABLE_LIST_DB_NAME + ' initialize canceled');
+		}
 	}
-}
 
-/**
- * 非表示リストの読み込み
- * @return {Array.<string>}
- */
-function getDisableList() {
-	if (disableList == null) {
-		if (GM_getValue(DISABLE_LIST_DB_NAME) == undefined) {
-			initializeDisableListDB();
+	/**
+	 * 非表示リストの読み込み
+	 * @return {Array.<string>}
+	 */
+	function getDisableList() {
+		if (disableList == null) {
+			if (GM_getValue(DB_NAMES.DISABLE_LIST) == undefined) {
+				initializeDisableListDB();
+			}
+
+			disableList = GM_getValue(DB_NAMES.DISABLE_LIST);
 		}
 
-		disableList = GM_getValue(DISABLE_LIST_DB_NAME);
+		return disableList;
 	}
 
-	return disableList;
-}
-
-/**
- * 非表示リストの反映
- * @param {Array.<string>} list 非表示リスト
- */
-function setDisableList(list) {
-	GM_setValue(DISABLE_LIST_DB_NAME, list);
-	//console.log('save ' + DISABLE_LIST_DB_NAME);
-}
-
-/**
- * 非表示リストの追加
- * @param {string} name 配信者名
- */
-function addDisableList(name) {
-	disableList.push(name);
-
-	setDisableList(disableList);
-}
-
-/////////////////////////////
-// セクション非表示
-/////////////////////////////
-
-/**
- * 非表示セクションデータベースを初期化
- */
-function initializeDisableSectionDB() {
-	if (confirm('非表示リストを初期化しますか？')) {
-		let dsInitial = {
-			FIRST_LIST_SECTION_DB_NAME: false,
-			SECOND_LIST_SECTION_DB_NAME: false,
-			OTHER_SECTION_DB_NAME: true,
-			EVENT_TICKER_DB_NAME: false,
-		};
-
-		GM_setValue(DISABLE_SECTION_DB_NAME, dsInitial);
-		disableSection = GM_getValue(DISABLE_SECTION_DB_NAME);
-		//console.log(DISABLE_SECTION_DB_NAME + ' initialize');
-	} else {
-		//console.log(DISABLE_SECTION_DB_NAME + ' initialize canceled');
+	/**
+	 * 非表示リストの反映
+	 * @param {Array.<string>} list 非表示リスト
+	 */
+	function setDisableList(list) {
+		GM_setValue(DB_NAMES.DISABLE_LIST, list);
+		//console.log('save ' + DISABLE_LIST_DB_NAME);
 	}
-}
 
-/**
- * 非表示セクションの読み込み
- * @return {Array.<string,boolean>} 非表示セクション
- */
-function getDisableSection() {
-	if (disableSection == null) {
-		if (GM_getValue(DISABLE_SECTION_DB_NAME) == undefined) {
-			initializeDisableSectionDB();
+	/**
+	 * 非表示リストの追加
+	 * @param {string} name 配信者名
+	 */
+	function addDisableList(name) {
+		disableList.push(name);
+
+		setDisableList(disableList);
+	}
+
+	/////////////////////////////
+	// セクション非表示
+	/////////////////////////////
+
+	/**
+	 * 非表示セクションデータベースを初期化
+	 */
+	function initializeDisableSectionDB() {
+		if (confirm('非表示リストを初期化しますか？')) {
+			let dsInitial = {
+				FIRST_LIST_SECTION_DB_NAME: false,
+				SECOND_LIST_SECTION_DB_NAME: false,
+				OTHER_SECTION_DB_NAME: true,
+				EVENT_TICKER_DB_NAME: false,
+			};
+
+			GM_setValue(DB_NAMES.DISABLE_SECTION, dsInitial);
+			disableSection = GM_getValue(DB_NAMES.DISABLE_SECTION);
+			//console.log(DISABLE_SECTION_DB_NAME + ' initialize');
+		} else {
+			//console.log(DISABLE_SECTION_DB_NAME + ' initialize canceled');
+		}
+	}
+
+	/**
+	 * 非表示セクションの読み込み
+	 * @return {Array.<string,boolean>} 非表示セクション
+	 */
+	function getDisableSection() {
+		if (disableSection == null) {
+			if (GM_getValue(DB_NAMES.DISABLE_SECTION) == undefined) {
+				initializeDisableSectionDB();
+			}
+
+			disableSection = GM_getValue(DB_NAMES.DISABLE_SECTION);
 		}
 
-		disableSection = GM_getValue(DISABLE_SECTION_DB_NAME);
+		return disableSection;
 	}
 
-	return disableSection;
-}
+	/**
+	 * 非表示セクションを保存
+	 * @param {string} section セクション名
+	 * @param {boolean} bool trueで非表示
+	 */
+	function setDisableSection(section, bool) {
+		let ds = getDisableSection();
+		ds[section] = bool;
 
-/**
- * 非表示セクションを保存
- * @param {string} section セクション名
- * @param {boolean} bool trueで非表示
- */
-function setDisableSection(section, bool) {
-	let firstListSection = $('.noblk').first();
-	let secondListSection = $('.noblk').eq(1);
-	let otherSection = $('#otherToggle');
-	let otherToggleButton = $('#otherToggleButton');
-	let eventTicker = $('.ticker');
+		disableSection = ds;
+		GM_setValue(DB_NAMES.DISABLE_SECTION, ds);
+		updateDisableSection();
+	}
 
-	let ds = getDisableSection();
-	ds[section] = bool;
+	/**
+	 * 非表示セクションを更新
+	 */
+	function updateDisableSection() {
+		let firstListSection = $('.noblk').first();
+		let secondListSection = $('.noblk').eq(1);
+		let otherSection = $('#otherToggle');
+		let otherToggleButton = $('#otherToggleButton');
+		let eventTicker = $('.ticker');
+		let ds = getDisableSection();
 
-	switch (section) {
-		case FIRST_LIST_SECTION_DB_NAME:
-			firstListSection.slideToggle(!bool);
-			break;
-		case SECOND_LIST_SECTION_DB_NAME:
-			secondListSection.slideToggle(!bool);
-			break;
-		case OTHER_SECTION_DB_NAME:
-			otherSection.slideToggle(!bool);
+		if (ds[DB_NAMES.FIRST_LIST]) {
+			firstListSection.toggle(false);
+		} else {
+			firstListSection.toggle(true);
+		}
+
+		if (ds[DB_NAMES.SECOND_LIST]) {
+			secondListSection.toggle(false);
+		} else {
+			secondListSection.toggle(true);
+		}
+
+		if (ds[DB_NAMES.OTHER_SECTION]) {
+			otherSection.toggle(false);
 			// ボタンテキストを変更
-			otherToggleButton.val((otherToggleButton.val() == 'その他の情報を展開') ? 'その他の情報を格納' : 'その他の情報を展開');
-			break;
-		case EVENT_TICKER_DB_NAME:
-			eventTicker.slideToggle(!bool);
-			break;
-	}
-
-	GM_setValue(DISABLE_SECTION_DB_NAME, ds);
-}
-
-/**
- * セクションの表示を切り替え
- * @param {string} section セクション名
- */
-function toggleSection(section) {
-	let firstListSection = $('.noblk').first();
-	let secondListSection = $('.noblk').eq(1);
-	let otherSection = $('#otherToggle');
-	let otherToggleButton = $('#otherToggleButton');
-	let eventTicker = $('.ticker');
-
-	switch (section) {
-		case FIRST_LIST_SECTION_DB_NAME:
-			firstListSection.slideToggle();
-			break;
-		case SECOND_LIST_SECTION_DB_NAME:
-			secondListSection.slideToggle();
-			break;
-		case OTHER_SECTION_DB_NAME:
-			otherSection.slideToggle();
+			otherToggleButton.val('その他の情報を展開');
+		} else {
+			otherSection.toggle(true);
 			// ボタンテキストを変更
-			otherToggleButton.val((otherToggleButton.val() == 'その他の情報を展開') ? 'その他の情報を格納' : 'その他の情報を展開');
-			break;
-		case EVENT_TICKER_DB_NAME:
-			eventTicker.slideToggle();
-			break;
-	}
-}
-
-/////////////////////////////
-// お気に入り
-/////////////////////////////
-
-/**
- * お気に入りリストを初期化
- */
-function initializeFavoriteListDB() {
-	if (confirm('お気に入りリストを初期化しますか？')) {
-		GM_setValue(FAVORITE_LIST_DB_NAME, []);
-		FavoriteList = GM_getValue(FAVORITE_LIST_DB_NAME);
-		//console.log(FAVORITE_LIST_DB_NAME + ' initialize');
-	}
-}
-
-/**
- * お気に入りリストの取得
- * @return {Array.<string>} お気に入りリスト
- */
-function getFavoriteList() {
-	if (FavoriteList == null) {
-		if (GM_getValue(FAVORITE_LIST_DB_NAME) == undefined) {
-			initializeFavoriteListDB();
+			otherToggleButton.val('その他の情報を格納');
 		}
 
-		FavoriteList = GM_getValue(FAVORITE_LIST_DB_NAME);
+		if (ds[DB_NAMES.EVENT_TICKER]) {
+			eventTicker.toggle(false);
+		} else {
+			eventTicker.toggle(true);
+		}
 	}
 
-	return FavoriteList;
-}
+	/**
+	 * セクションの表示を切り替え
+	 * @param {string} section セクション名
+	 */
+	function toggleSection(section) {
+		let ds = getDisableSection();
 
-/**
- * お気に入りリストを保存
- * @param {Array.<string>} list お気に入りリスト
- */
-function setFavoriteList(list) {
-	GM_setValue(FAVORITE_LIST_DB_NAME, list);
-	//console.log('save ' + FAVORITE_LIST_DB_NAME);
-}
+		switch (section) {
+			case DB_NAMES.FIRST_LIST:
+				ds[DB_NAMES.FIRST_LIST] = !ds[DB_NAMES.FIRST_LIST];
+				break;
+			case DB_NAMES.SECOND_LIST:
+				ds[DB_NAMES.SECOND_LIST] = !ds[DB_NAMES.SECOND_LIST];
+				break;
+			case DB_NAMES.OTHER:
+				ds[DB_NAMES.OTHER] = !ds[DB_NAMES.OTHER];
+				break;
+			case DB_NAMES.EVENT_TICKER:
+				ds[DB_NAMES.EVENT_TICKER] = !ds[DB_NAMES.EVENT_TICKER];
+				break;
+		}
 
-/**
- * お気に入りリストへ追加
- * @param {string} name 配信者名
- */
-function addFavoriteList(name) {
-	FavoriteList.push(name);
-	setFavoriteList(FavoriteList);
-}
+		disableSection = ds;
+		GM_setValue(DB_NAMES.DISABLE_SECTION, ds);
+		updateDisableSection();
+	}
 
-/**
- * お気に入りリストから一つ削除
- * @param {number} index インデックス
- */
-function removeFavoriteList(index) {
-	let list = getFavoriteList();
-	list.splice(index, 1);
+	/////////////////////////////
+	// お気に入り
+	/////////////////////////////
 
-	setFavoriteList(list);
-}
+	/**
+	 * お気に入りリストを初期化
+	 */
+	function initializeFavoriteListDB() {
+		if (confirm('お気に入りリストを初期化しますか？')) {
+			GM_setValue(DB_NAMES.FAVORITE_LIST, []);
+			FavoriteList = GM_getValue(DB_NAMES.FAVORITE_LIST);
+			//console.log(FAVORITE_LIST_DB_NAME + ' initialize');
+		}
+	}
 
-/**
- * お気に入りした行を移動
- * @param {Object} row 行のオブジェクト
- */
-function moveFavoriteRow(row) {
-	// 2次から1次へ変換
-	if ($(row).parents('table').attr('id') == 'secondList') {
-		// 経過時間と開始時間を結合
-		let dur = $(row).find('span.duration').prop('outerHTML');
-		let date = $(row).find('span.date').prop('outerHTML');
-		// 配信サイトの画像を変更
-		$(row).find('td.status a > img').attr('src', function () {
-			return $(this).attr('src').replace(/_s/g, '');
+	/**
+	 * お気に入りリストの取得
+	 * @return {Array.<string>} お気に入りリスト
+	 */
+	function getFavoriteList() {
+		if (FavoriteList == null) {
+			if (GM_getValue(DB_NAMES.FAVORITE_LIST) == undefined) {
+				initializeFavoriteListDB();
+			}
+
+			FavoriteList = GM_getValue(DB_NAMES.FAVORITE_LIST);
+		}
+
+		return FavoriteList;
+	}
+
+	/**
+	 * お気に入りリストを保存
+	 * @param {Array.<string>} list お気に入りリスト
+	 */
+	function setFavoriteList(list) {
+		GM_setValue(DB_NAMES.FAVORITE_LIST, list);
+		//console.log('save ' + FAVORITE_LIST_DB_NAME);
+	}
+
+	/**
+	 * お気に入りリストへ追加
+	 * @param {string} name 配信者名
+	 */
+	function addFavoriteList(name) {
+		FavoriteList.push(name);
+		setFavoriteList(FavoriteList);
+	}
+
+	/**
+	 * お気に入りリストから一つ削除
+	 * @param {number} index インデックス
+	 */
+	function removeFavoriteList(index) {
+		let list = getFavoriteList();
+		list.splice(index, 1);
+
+		setFavoriteList(list);
+	}
+
+	/**
+	 * お気に入りした行を移動
+	 * @param {Object} row 行のオブジェクト
+	 */
+	function moveFavoriteRow(row) {
+		// 2次から1次へ変換
+		if ($(row).parents('table').attr('id') == 'secondList') {
+			// 経過時間と開始時間を結合
+			let dur = $(row).find('span.duration').prop('outerHTML');
+			let date = $(row).find('span.date').prop('outerHTML');
+			// 配信サイトの画像を変更
+			$(row).find('td.status a > img').attr('src', function () {
+				return $(this).attr('src').replace(/_s/g, '');
+			});
+			// 視聴者数
+			$(row).find('.viewers').html(
+				'<span class="viewersNum">' + $(row).find('.viewers').text() + '</span>'
+			);
+
+			// 適用
+			$(row).find('td.lastDate').html(dur + '<br>' + date);
+			$(row).find('td.duration').remove();
+		}
+		// 移動
+		$(row).removeClass('invisible').addClass('favorite').insertBefore($('#firstList tr').not('.favorite').eq(1));
+		// クラスが空のときofflineを追加
+		if ($(row).hasClass('favorite') && !$(row).hasClass('online')) {
+			$(row).addClass('offline');
+		}
+		// 終了してからの時間を表示
+		if ($(row).hasClass('offline')) {
+			let duration = '<span class="duration">' +
+				getTimeSinceEnd($(row).find('td.lastDate > span.date').text()) +
+				'</span>';
+			$(row).find('td.lastDate > span.date').before(duration + '<br>');
+		}
+	}
+
+	/**
+	 * お気に入り行から削除
+	 * @param {Object} row 行のオブジェクト
+	 */
+	function removeFavoriteRow(row) {
+		// 移動
+		$(row).removeClass('favorite').insertBefore($('#firstList tr.offline').first());
+		// クラスが空のときinvisibleを追加
+		if (!$(row).hasClass('online') && !$(row).hasClass('offline')) {
+			$(row).addClass('invisible');
+		}
+	}
+
+	/**
+	 * 日時から現在までの時間を取得
+	 * @param {string} date 時間
+	 * @return {string} 時間
+	 */
+	function getTimeSinceEnd(date) {
+		// 現在時刻
+		let now = new Date();
+		// 先頭の波を削除
+		date = date.replace(/^～/, '');
+		// 文字列から時間(秒)に変換
+		let time = (now.getTime() - new Date(now.getFullYear(),
+			('0' + date.match(/\d+/)).slice(-2) - 1,
+			('0' + date.match(/\d+(?=\s)/)).slice(-2),
+			date.match(/\d+(?=:)/),
+			date.match(/\d+$/),
+			0)) / 1000;
+		// ミリ秒から時間へ変換
+		if (time / 60 < 60) {
+			// 60分以内
+			return '～' + Math.round(time / 60) + '分前';
+		} else if (time / 3600 < 24) {
+			// 24時間以内
+			return '～' + Math.round(time / 3600) + '時間前';
+		} else if (time / 86400 < 360) {
+			// 360日以内
+			return '～' + Math.round(time / 86400) + '日前';
+		} else {
+			// 1年以上
+			return '～' + Math.round(time / 31104000) + '年前';
+		}
+	}
+
+	/////////////////////////////
+	// 並び替え
+	/////////////////////////////
+
+	/**
+	 * テーブル並び替え設定を初期化
+	 */
+	function initializeTableOrderDB() {
+		if (confirm('並び替えを初期化しますか？')) {
+			GM_setValue(DB_NAMES.TABLE_ORDER, TABLE_ORDERS.DEFAULT);
+			TableOrder = GM_getValue(DB_NAMES.TABLE_ORDER);
+			//console.log(TABLE_ORDER_DB_NAME + ' initialize');
+		}
+	}
+
+	/**
+	 * テーブル並び替え設定を取得
+	 * @return {string} テーブル並び替え設定
+	 */
+	function getTableOrder() {
+		if (TableOrder == null) {
+			if (GM_getValue(DB_NAMES.TABLE_ORDER) == undefined) {
+				initializeTableOrderDB();
+			}
+
+			TableOrder = GM_getValue(DB_NAMES.TABLE_ORDER);
+		}
+
+		return TableOrder;
+	}
+
+	/**
+	 * テーブル並び替え設定を設定
+	 * @param {string} order テーブル並び替え設定
+	 */
+	function setTableOrder(order) {
+		TableOrder = order;
+		GM_setValue(DB_NAMES.TABLE_ORDER, TableOrder);
+	}
+
+	/**
+	 * テーブル並び替えをデフォルトにする
+	 */
+	function reorderDefault() {
+		// デフォルト
+		//console.log('def');
+		if (confirm('ページを更新します')) {
+			location.reload();
+		}
+	}
+
+	/**
+	 * テーブル並び替えあいうえお順にする
+	 */
+	function reorderAlphabetical() {
+		// ヘッダ
+		let header = $('#firstList tr').eq(0).prop('outerHTML');
+
+		// お気に入り
+		let favoriteOffline = getOuterHTML($('#firstList tr.favorite'));
+		let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
+		favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+			return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
 		});
-		// 視聴者数
-		$(row).find('.viewers').html(
-			'<span class="viewersNum">' + $(row).find('.viewers').text() + '</span>'
-		);
+		let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
+
+		// オンライン
+		let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
+		online = $(online).sort(function (a, b) {
+			return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
+		});
+		online = getOuterHTML($(online));
+
+		// オフライン
+		let offline = getOuterHTML($('#firstList tr.offline').not('.favorite'));
+
+		// 非表示
+		let invisible = getOuterHTML($('#firstList tr.invisible'));
+
+		// 2次
+		let second = getOuterHTML($('#secondList tr.online'));
+		second = $(second).sort(function (a, b) {
+			return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
+		});
+		second = getOuterHTML($(second));
 
 		// 適用
-		$(row).find('td.lastDate').html(dur + '<br>' + date);
-		$(row).find('td.duration').remove();
-	}
-	// 移動
-	$(row).removeClass('invisible').addClass('favorite').insertBefore($('#firstList tr').not('.favorite').eq(1));
-	// クラスが空のときofflineを追加
-	if ($(row).hasClass('favorite') && !$(row).hasClass('online')) {
-		$(row).addClass('offline');
-	}
-	// 終了してからの時間を表示
-	if ($(row).hasClass('offline')) {
-		let duration = '<span class="duration">' +
-			getTimeSinceEnd($(row).find('td.lastDate > span.date').text()) +
-			'</span>';
-		$(row).find('td.lastDate > span.date').before(duration + '<br>');
-	}
-}
-
-/**
- * お気に入り行から削除
- * @param {Object} row 行のオブジェクト
- */
-function removeFavoriteRow(row) {
-	// 移動
-	$(row).removeClass('favorite').insertBefore($('#firstList tr.offline').first());
-	// クラスが空のときinvisibleを追加
-	if (!$(row).hasClass('online') && !$(row).hasClass('offline')) {
-		$(row).addClass('invisible');
-	}
-}
-
-/**
- * 日時から現在までの時間を取得
- * @param {string} date 時間
- * @return {string} 時間
- */
-function getTimeSinceEnd(date) {
-	// 現在時刻
-	let now = new Date();
-	// 先頭の波を削除
-	date = date.replace(/^～/, '');
-	// 文字列から時間(秒)に変換
-	let time = (now.getTime() - new Date(now.getFullYear(),
-		('0' + date.match(/\d+/)).slice(-2) - 1,
-		('0' + date.match(/\d+(?=\s)/)).slice(-2),
-		date.match(/\d+(?=:)/),
-		date.match(/\d+$/),
-		0)) / 1000;
-	// ミリ秒から時間へ変換
-	if (time / 60 < 60) {
-		// 60分以内
-		return '～' + Math.round(time / 60) + '分前';
-	} else if (time / 3600 < 24) {
-		// 24時間以内
-		return '～' + Math.round(time / 3600) + '時間前';
-	} else if (time / 86400 < 360) {
-		// 360日以内
-		return '～' + Math.round(time / 86400) + '日前';
-	} else {
-		// 1年以上
-		return '～' + Math.round(time / 31104000) + '年前';
-	}
-}
-
-/////////////////////////////
-// 並び替え
-/////////////////////////////
-
-/**
- * テーブル並び替え設定を初期化
- */
-function initializeTableOrderDB() {
-	if (confirm('並び替えを初期化しますか？')) {
-		GM_setValue(TABLE_ORDER_DB_NAME, DEFAULT_ORDER_NAME);
-		TableOrder = GM_getValue(TABLE_ORDER_DB_NAME);
-		//console.log(TABLE_ORDER_DB_NAME + ' initialize');
-	}
-}
-
-/**
- * テーブル並び替え設定を取得
- * @return {string} テーブル並び替え設定
- */
-function getTableOrder() {
-	if (TableOrder == null) {
-		if (GM_getValue(TABLE_ORDER_DB_NAME) == undefined) {
-			initializeTableOrderDB();
-		}
-
-		TableOrder = GM_getValue(TABLE_ORDER_DB_NAME);
+		$('#firstList tbody').html(header + favorite + online + offline + invisible);
+		$('#secondList tbody').html(second);
+		//console.log('alp');
 	}
 
-	return TableOrder;
-}
+	/**
+	 * テーブル並び替えを開始時間順にする
+	 */
+	function reorderStartTime() {
+		// ヘッダ
+		let header = $('#firstList tr').eq(0).prop('outerHTML');
 
-/**
- * テーブル並び替え設定を設定
- * @param {string} order テーブル並び替え設定
- */
-function setTableOrder(order) {
-	TableOrder = order;
-	GM_setValue(TABLE_ORDER_DB_NAME, TableOrder);
-}
+		// お気に入り
+		let favoriteOffline = getOuterHTML($('#firstList tr.favorite.offline'));
+		let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
+		favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+			return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
+		});
+		let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
 
-/**
- * テーブル並び替えをデフォルトにする
- */
-function reorderDefault() {
-	// デフォルト
-	//console.log('def');
-	if (confirm('ページを更新します')) {
-		location.reload();
+		//オンライン
+		let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
+		online = $(online).sort(function (a, b) {
+			return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
+		});
+		online = getOuterHTML($(online));
+
+		// オフライン
+		let offline = getOuterHTML($('#firstList tr.offline').not('.favorite'));
+
+		// 非表示
+		let invisible = getOuterHTML($('#firstList tr.invisible'));
+
+		// 2次
+		let second = getOuterHTML($('#secondList tr.online'));
+		second = $(second).sort(function (a, b) {
+			return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
+		});
+		second = getOuterHTML($(second));
+
+		// 適用
+		$('#firstList tbody').html(header + favorite + online + offline + invisible);
+		$('#secondList tbody').html(second);
+		//console.log('sta');
 	}
-}
 
-/**
- * テーブル並び替えあいうえお順にする
- */
-function reorderAlphabetical() {
-	// ヘッダ
-	let header = $('#firstList tr').eq(0).prop('outerHTML');
+	/**
+	 * テーブル並び替えを登録番号順にする
+	 */
+	function reorderId() {
+		// ヘッダ
+		let header = $('#firstList tr').eq(0).prop('outerHTML');
 
-	// お気に入り
-	let favoriteOffline = getOuterHTML($('#firstList tr.favorite'));
-	let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
-	favoriteOnline = $(favoriteOnline).sort(function (a, b) {
-		return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
-	});
-	let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
+		// お気に入り
+		let favoriteOffline = getOuterHTML($('#firstList tr.favorite.offline'));
+		let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
+		favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+			return getTimeAfterStarting($(a).find('span.date').text()) < getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
+		});
+		let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
 
-	// オンライン
-	let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
-	online = $(online).sort(function (a, b) {
-		return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
-	});
-	online = getOuterHTML($(online));
+		//オンライン
+		let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
+		online = $(online).sort(function (a, b) {
+			return Number($(a).find('td.log > a').attr('href').slice(14)) < Number($(b).find('td.log > a').attr('href').slice(14)) ? -1 : 1;
+		});
+		online = getOuterHTML($(online));
 
-	// オフライン
-	let offline = getOuterHTML($('#firstList tr.offline').not('.favorite'));
+		// オフライン
+		let offline = getOuterHTML($('#firstList tr.offline').not('.favorite'));
 
-	// 非表示
-	let invisible = getOuterHTML($('#firstList tr.invisible'));
+		// 非表示
+		let invisible = getOuterHTML($('#firstList tr.invisible'));
 
-	// 2次
-	let second = getOuterHTML($('#secondList tr.online'));
-	second = $(second).sort(function (a, b) {
-		return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
-	});
-	second = getOuterHTML($(second));
+		// 2次
+		let second = getOuterHTML($('#secondList tr.online'));
+		second = $(second).sort(function (a, b) {
+			return Number($(a).find('td.log > a').attr('href').slice(14)) < Number($(b).find('td.log > a').attr('href').slice(14)) ? -1 : 1;
+		});
+		second = getOuterHTML($(second));
 
-	// 適用
-	$('#firstList tbody').html(header + favorite + online + offline + invisible);
-	$('#secondList tbody').html(second);
-	//console.log('alp');
-}
+		// 適用
+		$('#firstList tbody').html(header + favorite + online + offline + invisible);
+		$('#secondList tbody').html(second);
+		//console.log('id');
+	}
 
-/**
- * テーブル並び替えを開始時間順にする
- */
-function reorderStartTime() {
-	// ヘッダ
-	let header = $('#firstList tr').eq(0).prop('outerHTML');
+	/**
+	 * テーブルの行をまとめる
+	 * @param {Object} obj まとめる行のオブジェクト
+	 * @return {string} まとめた行
+	 */
+	function getOuterHTML(obj) {
+		let outerHTML = '';
 
-	// お気に入り
-	let favoriteOffline = getOuterHTML($('#firstList tr.favorite.offline'));
-	let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
-	favoriteOnline = $(favoriteOnline).sort(function (a, b) {
-		return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
-	});
-	let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
-
-	//オンライン
-	let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
-	online = $(online).sort(function (a, b) {
-		return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
-	});
-	online = getOuterHTML($(online));
-
-	// オフライン
-	let offline = getOuterHTML($('#firstList tr.offline').not('.favorite'));
-
-	// 非表示
-	let invisible = getOuterHTML($('#firstList tr.invisible'));
-
-	// 2次
-	let second = getOuterHTML($('#secondList tr.online'));
-	second = $(second).sort(function (a, b) {
-		return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
-	});
-	second = getOuterHTML($(second));
-
-	// 適用
-	$('#firstList tbody').html(header + favorite + online + offline + invisible);
-	$('#secondList tbody').html(second);
-	//console.log('sta');
-}
-
-/**
- * テーブル並び替えを登録番号順にする
- */
-function reorderId() {
-	// ヘッダ
-	let header = $('#firstList tr').eq(0).prop('outerHTML');
-
-	// お気に入り
-	let favoriteOffline = getOuterHTML($('#firstList tr.favorite.offline'));
-	let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
-	favoriteOnline = $(favoriteOnline).sort(function (a, b) {
-		return getTimeAfterStarting($(a).find('span.date').text()) < getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
-	});
-	let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
-
-	//オンライン
-	let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
-	online = $(online).sort(function (a, b) {
-		return Number($(a).find('td.log > a').attr('href').slice(14)) < Number($(b).find('td.log > a').attr('href').slice(14)) ? -1 : 1;
-	});
-	online = getOuterHTML($(online));
-
-	// オフライン
-	let offline = getOuterHTML($('#firstList tr.offline').not('.favorite'));
-
-	// 非表示
-	let invisible = getOuterHTML($('#firstList tr.invisible'));
-
-	// 2次
-	let second = getOuterHTML($('#secondList tr.online'));
-	second = $(second).sort(function (a, b) {
-		return Number($(a).find('td.log > a').attr('href').slice(14)) < Number($(b).find('td.log > a').attr('href').slice(14)) ? -1 : 1;
-	});
-	second = getOuterHTML($(second));
-
-	// 適用
-	$('#firstList tbody').html(header + favorite + online + offline + invisible);
-	$('#secondList tbody').html(second);
-	//console.log('id');
-}
-
-/**
- * テーブルの行をまとめる
- * @param {Object} obj まとめる行のオブジェクト
- * @return {string} まとめた行
- */
-function getOuterHTML(obj) {
-	let outerHTML = '';
-
-	obj.each(function () {
-		outerHTML += $(this).prop('outerHTML');
-	});
-
-	return outerHTML;
-}
-
-/**
- * 配信開始からの時間を取得
- * @param {string} date 配信開始時間
- * @return {string}
- */
-function getTimeAfterStarting(date) {
-	// 現在時刻
-	let now = new Date();
-	// 先頭の波を削除
-	date = date.replace(/～$/, '');
-	// 文字列から時間(秒)に変換
-	let time = (new Date(now.getFullYear(), ('0' + date.match(/\d+/)).slice(-2) - 1,
-		('0' + date.match(/\d+(?=\s)/)).slice(-2),
-		date.match(/\d+(?=:)/),
-		date.match(/\d+$/),
-		0) - now.getTime()) / -1000;
-
-	return time;
-}
-
-/**
- * ボタンから配信者名を取得
- * @param {Object} button ボタン
- * @return {string} 配信者名
- */
-function nameFromDisableButton(button) {
-	return $(button).prev().prev().text().replace(/\r?\n/g, '');
-	// return $(button).parent().prevAll('td.name').children('a').text().replace(/\r?\n/g, '');
-}
-
-/**
- * お気に入りボタンから配信者名を取得
- * @param {Object} favoriteMark お気に入りボタン
- * @return {string} 配信者名
- */
-function nameFromFavoriteButton(favoriteMark) {
-	return $(favoriteMark).prev().text().replace(/\r?\n/g, '');
-}
-
-/**
- * ボタンのあるテーブルの行を削除
- * @param {Object} button ボタン
- */
-function deleteRow(button) {
-	$(button).parent().parent().remove();
-	// console.log($(button).prev().text().replace(/\r?\n/g,'') + ' delete');
-}
-
-/////////////////////////////
-// サムネイル設定
-/////////////////////////////
-
-/**
- * サムネイル設定を初期化
- */
-function initializeThumbnailSetting() {
-	if (confirm('サムネイル設定を初期化しますか？')) {
-		GM_setValue(THUMBNAIL_SETTING_DB_NAME, {
-			mode: THUMBNAIL_DEFAULT,
-			keepAspect: true,
-			width: 50,
-			height: 50,
+		obj.each(function () {
+			outerHTML += $(this).prop('outerHTML');
 		});
 
-		thumbnailSetting = GM_getValue(THUMBNAIL_SETTING_DB_NAME);
+		return outerHTML;
 	}
-}
 
-/**
- * サムネイル設定を取得
- * @return {Object} サムネイル設定
- */
-function getThumbnailSetting() {
-	if (thumbnailSetting == null) {
-		if (GM_getValue(THUMBNAIL_SETTING_DB_NAME) == undefined) {
-			initializeThumbnailSetting();
+	/**
+	 * 配信開始からの時間を取得
+	 * @param {string} date 配信開始時間
+	 * @return {string}
+	 */
+	function getTimeAfterStarting(date) {
+		// 現在時刻
+		let now = new Date();
+		// 先頭の波を削除
+		date = date.replace(/～$/, '');
+		// 文字列から時間(秒)に変換
+		let time = (new Date(now.getFullYear(), ('0' + date.match(/\d+/)).slice(-2) - 1,
+			('0' + date.match(/\d+(?=\s)/)).slice(-2),
+			date.match(/\d+(?=:)/),
+			date.match(/\d+$/),
+			0) - now.getTime()) / -1000;
+
+		return time;
+	}
+
+	/**
+	 * ボタンから配信者名を取得
+	 * @param {Object} button ボタン
+	 * @return {string} 配信者名
+	 */
+	function nameFromDisableButton(button) {
+		return $(button).prev().prev().text().replace(/\r?\n/g, '');
+		// return $(button).parent().prevAll('td.name').children('a').text().replace(/\r?\n/g, '');
+	}
+
+	/**
+	 * お気に入りボタンから配信者名を取得
+	 * @param {Object} favoriteMark お気に入りボタン
+	 * @return {string} 配信者名
+	 */
+	function nameFromFavoriteButton(favoriteMark) {
+		return $(favoriteMark).prev().text().replace(/\r?\n/g, '');
+	}
+
+	/**
+	 * ボタンのあるテーブルの行を削除
+	 * @param {Object} button ボタン
+	 */
+	function deleteRow(button) {
+		$(button).parent().parent().remove();
+		// console.log($(button).prev().text().replace(/\r?\n/g,'') + ' delete');
+	}
+
+	/////////////////////////////
+	// サムネイル設定
+	/////////////////////////////
+
+	/**
+	 * サムネイル設定を初期化
+	 */
+	function initializeThumbnailSetting() {
+		if (confirm('サムネイル設定を初期化しますか？')) {
+			GM_setValue(DB_NAMES.THUMBNAIL_SETTING, {
+				mode: THUMBNAIL_MODES.DEFAULT,
+				keepAspect: true,
+				width: 50,
+				height: 50,
+			});
+
+			thumbnailSetting = GM_getValue(DB_NAMES.THUMBNAIL_SETTING);
+		}
+	}
+
+	/**
+	 * サムネイル設定を取得
+	 * @return {Object} サムネイル設定
+	 */
+	function getThumbnailSetting() {
+		if (thumbnailSetting == null) {
+			if (GM_getValue(DB_NAMES.THUMBNAIL_SETTING) == undefined) {
+				initializeThumbnailSetting();
+			}
+
+			thumbnailSetting = GM_getValue(DB_NAMES.THUMBNAIL_SETTING);
 		}
 
-		thumbnailSetting = GM_getValue(THUMBNAIL_SETTING_DB_NAME);
+		return thumbnailSetting;
 	}
 
-	return thumbnailSetting;
-}
-
-/**
- * サムネイル設定を保存
- * @param {Object} setting サムネイル設定
- */
-function setThumbnailSetting(setting) {
-	GM_setValue(THUMBNAIL_SETTING_DB_NAME, setting);
-}
-
-/**
- * サムネイル表示方法を変更
- * @param {string} mode モード
- */
-function applyThumbnailMode(mode) {
-	switch (mode) {
-		case THUMBNAIL_DEFAULT:
-			break;
-		case THUMBNAIL_MOUSE_OVER:
-			// マウスオーバー
-			$('.popup').each(function () {
-				let a = $(this).find('a');
-				// 通常画像
-				$(a).find('img').not('[alt="beam"]').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\';this.className="thumbnail";').attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\';this.className="";');
-				// videoタグ
-				$(a).find('video').hide().parent('a').hover(
-					function () {
-						$(this).find('video').show();
-						$(this).find('img').hide();
-					},
-					function () {
-						$(this).find('video').hide();
-						$(this).find('img').show();
-					}
-				);
-
-				// 適用
-				$(a).find('img.r').remove();
-				$(a).appendTo($(this).parent('td.status'));
-				$(this).remove();
-			});
-			break;
-		case THUMBNAIL_ALLWAYS:
-			break;
+	/**
+	 * サムネイル設定を保存
+	 * @param {Object} setting サムネイル設定
+	 */
+	function setThumbnailSetting(setting) {
+		GM_setValue(DB_NAMES.THUMBNAIL_SETTING, setting);
 	}
-}
 
-/**
- * サンプル画像を設定
- * @param {boolean} keepAspect アスペクト比を保持するか
- * @param {number} width 横
- * @param {number} height 縦
- */
-function setSampleImage(keepAspect, width, height) {
-	let ts = getThumbnailSetting();
-	ts.keepAspect = keepAspect;
-	ts.width = width;
-	ts.height = height;
-	setThumbnailSetting(ts);
+	/**
+	 * サムネイル表示方法を変更
+	 * @param {string} mode モード
+	 */
+	function applyThumbnailMode(mode) {
+		switch (mode) {
+			case THUMBNAIL_MODES.DEFAULT:
+				break;
+			case THUMBNAIL_MODES.MOUSE_OVER:
+				// マウスオーバー
+				$('.popup').each(function () {
+					let a = $(this).find('a');
+					// 通常画像
+					$(a).find('img').not('[alt="beam"]').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\';this.className=\'thumbnail\';').attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\';this.className=\'\';');
+					// videoタグ
+					$(a).find('video').hide().parent('a').hover(
+						function () {
+							$(this).find('video').show();
+							$(this).find('img').hide();
+						},
+						function () {
+							$(this).find('video').hide();
+							$(this).find('img').show();
+						}
+					);
 
-	if (ts.keepAspect) {
-		$('#thumbnailSampleImage').attr('width', ts.width).removeAttr('height').next().text(ts.width + 'px x ' + 'auto');
-		$('#sampleImageHeight').hide();
-	} else {
-		$('#thumbnailSampleImage').attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px x ' + ts.height + 'px');
-		$('#sampleImageHeight').show();
+					// 適用
+					$(a).find('img.r').remove();
+					$(a).appendTo($(this).parent('td.status'));
+					$(this).remove();
+				});
+				break;
+			case THUMBNAIL_MODES.ALLWAYS:
+				break;
+		}
 	}
-}
 
-/////////////////////////////
-// デバッグ
-/////////////////////////////
+	/**
+	 * サンプル画像を設定
+	 * @param {boolean} keepAspect アスペクト比を保持するか
+	 * @param {number} width 横
+	 * @param {number} height 縦
+	 */
+	function setSampleImage(keepAspect, width, height) {
+		let ts = getThumbnailSetting();
+		ts.keepAspect = keepAspect;
+		ts.width = width;
+		ts.height = height;
+		setThumbnailSetting(ts);
 
-// デバッグボタン
-// $('.debug_button').on('click', function () {
-//     alert(getDisableList());
-// });
+		if (ts.keepAspect) {
+			$('#thumbnailSampleImage').attr('width', ts.width).removeAttr('height').next().text(ts.width + 'px x ' + 'auto');
+			$('#sampleImageHeight').hide();
+		} else {
+			$('#thumbnailSampleImage').attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px x ' + ts.height + 'px');
+			$('#sampleImageHeight').show();
+		}
+	}
+
+	/////////////////////////////
+	// デバッグ
+	/////////////////////////////
+
+	// デバッグボタン
+	// $('.debug_button').on('click', function () {
+	//     alert(getDisableList());
+	// });
+})();
