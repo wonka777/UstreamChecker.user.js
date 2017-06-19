@@ -9,7 +9,7 @@
 // @grant       GM_setValue
 // @grant       GM_addStyle
 // @run-at		document-idle
-// @version     0.1.4
+// @version     0.1.5
 // ==/UserScript==
 
 /////////////////////////////
@@ -85,7 +85,6 @@
 	let thumbnailSetting;
 
 	$(window).load(function () {
-		let startTime = new Date().getTime();
 		/////////////////////////////
 		// ボタンの追加
 		/////////////////////////////
@@ -375,7 +374,7 @@
 					case THUMBNAIL_MODES.DEFAULT:
 						$('#thumbnailDefault').prop('checked', true);
 						$('.thumbnailSize').hide();
-						break;
+						return;
 					case THUMBNAIL_MODES.MOUSE_OVER:
 						$('#thumbnailMouseOver').prop('checked', true);
 						break;
@@ -539,8 +538,6 @@
 				});
 			}
 		});
-		let ms = new Date().getTime() - startTime;
-		console.log('time -> ' + ms);
 	});
 
 	/////////////////////////////
