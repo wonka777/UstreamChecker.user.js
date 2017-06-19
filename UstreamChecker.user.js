@@ -1,15 +1,15 @@
 // ==UserScript==
-// @name        UstreamChecker
+// @name        UstreamChecker.user.js
 // @namespace   a
-// @description UstreamChecker
+// @description UstreamChecker.user.js
 // @require     https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js
 // @include     http://revinx.net/ustream/
 // @include     https://revinx.net/ustream/
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @run-attr	document-idle
-// @version     0.1.3
+// @run-at		document-idle
+// @version     0.1.4
 // ==/UserScript==
 
 /////////////////////////////
@@ -78,11 +78,11 @@
 	// 変数
 	/////////////////////////////
 
-	let disableList = null;
-	let disableSection = null;
-	let FavoriteList = null;
-	let TableOrder = null;
-	let thumbnailSetting = null;
+	let disableList;
+	let disableSection;
+	let FavoriteList;
+	let TableOrder;
+	let thumbnailSetting;
 
 	$(window).load(function () {
 		let startTime = new Date().getTime();
@@ -97,10 +97,10 @@
 		$('td.name > a').after(buttonContent);
 
 		// デバッグボタン
-		// $('div#topMenuBar ul li:first-child').prepend('<input type="button" class="debug_button" value="デバッグ" />');
+		// $('div#topMenuBar ul li:first-child').prepend('<input type="button" class="debug_button" value="デバッグ">');
 
 		// その他の情報開閉トグルボタン
-		$('.noblk').last().before('<br><input type="button" id="otherToggleButton" value="その他の情報を格納" />');
+		$('.noblk').last().before('<br><input type="button" id="otherToggleButton" value="その他の情報を格納">');
 		// その他の情報をまとめる
 		$('#otherToggleButton').nextAll().wrapAll('<div id="otherToggle" />');
 
@@ -134,22 +134,77 @@
 		let mw = $('div.modal-content');
 
 		// タイトル
-		let mwContent = '<h2>拡張スクリプト設定</h2>';
+		let mwContent = '<h2>拡張スクリプト設定 &lt; ' + GM_info.script.name + ' version ' + GM_info.script.version + ' &gt;</h2>';
 		// お気に入りリスト
-		mwContent += '<div class="modal-item"><h3>お気に入りリスト</h3><textarea value="" id="favoriteListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" /><input type="button" class="button" id="favoriteListSaveButton" value="保存"><input type="button" class="button" id="favoriteListInitializeButton" value="初期化"></div>';
+		mwContent +=
+			'<div class="modal-item">' +
+			'	<h3>お気に入りリスト</h3>' +
+			'	<textarea value="" id="favoriteListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" />' +
+			'	<input type="button" class="button" id="favoriteListSaveButton" value="保存">' +
+			'	<input type="button" class="button" id="favoriteListInitializeButton" value="初期化">' +
+			'</div>';
 		// 非表示リスト
-		mwContent += '<div class="modal-item"><h3>非表示リスト</h3><textarea value="" id="disableListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" /><input type="button" class="button" id="disableListSaveButton" value="保存"><input type="button" class="button" id="disableListInitializeButton" value="初期化"></div>';
+		mwContent +=
+			'<div class="modal-item">' +
+			'	<h3>非表示リスト</h3>' +
+			'	<textarea value="" id="disableListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" />' +
+			'	<input type="button" class="button" id="disableListSaveButton" value="保存">' +
+			'	<input type="button" class="button" id="disableListInitializeButton" value="初期化">' +
+			'</div>';
 		// 非表示セクション
-		mwContent += '<div class="modal-item"><h3>部分非表示(チェックすると非表示)</h3><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="2nd_list_section"><label for="2nd_list_section">2次チェッカー</label><input type="checkbox" class="disableSectionCheckbox" id="other_section"><label for="other_section">その他の情報</label></div><div class="modal-item"><input type="checkbox" class="disableSectionCheckbox" id="event_ticker"><label for="event_ticker">イベントティッカー</label></div><input type="button" class="button" id="disableSectionInitializeButton" value="初期化"></div>';
+		mwContent +=
+			'<div class="modal-item">' +
+			'	<h3>部分非表示(チェックすると非表示)</h3>' +
+			'	<div class="modal-item">' +
+			'		<input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label>' +
+			'		<input type="checkbox" class="disableSectionCheckbox" id="2nd_list_section"><label for="2nd_list_section">2次チェッカー</label>' +
+			'		<input type="checkbox" class="disableSectionCheckbox" id="other_section"><label for="other_section">その他の情報</label>' +
+			'	</div>' +
+			'	<div class="modal-item">' +
+			'		<input type="checkbox" class="disableSectionCheckbox" id="event_ticker"><label for="event_ticker">イベントティッカー</label>' +
+			'	</div>' +
+			'	<input type="button" class="button" id="disableSectionInitializeButton" value="初期化">' +
+			'</div>';
 		// ソート順
-		mwContent += '<div class="modal-item"><h3>ソート順</h3><input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label><input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label><input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio">配信開始時間順</label><input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio">登録番号順</label></div>';
+		mwContent +=
+			'<div class="modal-item">' +
+			'	<h3>ソート順</h3>' +
+			'	<input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label>' +
+			'	<input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label>' +
+			'	<input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio">配信開始時間順</label>' +
+			'	<input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio">登録番号順</label>' +
+			'</div>';
 		// サムネイル設定
 		mwContent +=
-			'<div class="modal-item"><h3>サムネイル表示</h3><div class="modal-item thumbnailMode"><input type="radio" class="thumbnailCustomRadio" id="thumbnailDefault" name="thumbnailRadio"><label for="thumbnailDefault">デフォルト</label><input type="radio" class="thumbnailCustomRadio" id="thumbnailMouseOver" name="thumbnailRadio"><label for="thumbnailMouseOver">マウスオーバー</label><s><input type="radio" class="thumbnailCustomRadio" id="thumbnailAlways" name="thumbnailRadio"><label for="thumbnailAlways">常にサムネイルで表示する</label></s></div>' +
-			'<div class="modal-item thumbnailSize"><h4>画像の大きさ</h4><div class="thumbnailSample-item"><p id="sampleImageKeepAspect"><input type="checkbox" class="thumbnailRatioCheckbox" id="thumbnailAutoRatio"><label for="thumbnailAutoRatio">画像のアスペクト比を変更しない</label></p><p id="sampleImageWidth">横<input type="number" id="thumbnailWidth" value="50" min="50">px</p><p id="sampleImageHeight">縦<input type="number" id="thumbnailHeight" value="50" min="50">px</p></div><div class="thumbnailSample-item"><img id="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png"><figcaption>50px x 50px</figcaption></div></div></div>';
+			'<div class="modal-item">' +
+			'	<h3>サムネイル表示</h3>' +
+			'	<div class="modal-item thumbnailMode">' +
+			'		<input type="radio" class="thumbnailCustomRadio" id="thumbnailDefault" name="thumbnailRadio"><label for="thumbnailDefault">デフォルト</label>' +
+			'		<input type="radio" class="thumbnailCustomRadio" id="thumbnailMouseOver" name="thumbnailRadio"><label for="thumbnailMouseOver">マウスオーバー</label>' +
+			'		<s><input type="radio" class="thumbnailCustomRadio" id="thumbnailAlways" name="thumbnailRadio"><label for="thumbnailAlways">常にサムネイルで表示する</label></s>' +
+			'	</div>' +
+			'	<div class="modal-item thumbnailSize">' +
+			'		<h4>画像の大きさ</h4>' +
+			'		<div class="thumbnailSample-item">' +
+			'			<p id="sampleImageKeepAspect">' +
+			'				<input type="checkbox" class="thumbnailRatioCheckbox" id="thumbnailAutoRatio"><label for="thumbnailAutoRatio">画像のアスペクト比を変更しない</label>' +
+			'			</p>' +
+			'			<p id="sampleImageWidth">' +
+			'				横<input type="number" id="thumbnailWidth" value="50" min="50">px' +
+			'			</p>' +
+			'			<p id="sampleImageHeight">' +
+			'				縦<input type="number" id="thumbnailHeight" value="50" min="50">px' +
+			'			</p>' +
+			'		</div>' +
+			'		<div class="thumbnailSample-item">' +
+			'			<img id="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png">' +
+			'			<figcaption>50px x 50px</figcaption>' +
+			'		</div>' +
+			'	</div>' +
+			'</div>';
 
 		// 閉じるボタン
-		mwContent += '<input type="button" class="button" id="modal-close" value="閉じる"/>';
+		mwContent += '<input type="button" class="button" id="modal-close" value="閉じる">';
 		mw.append(mwContent);
 
 		/////////////////////////////
@@ -173,6 +228,7 @@
 			'.button:active {top: 3px; box-shadow: none;}';
 
 		GM_addStyle(addCSS);
+
 		/////////////////////////////
 		// 設定の反映
 		/////////////////////////////
@@ -180,61 +236,28 @@
 		// 非表示セクションの反映
 		updateDisableSection();
 
-		// 非表示リストの反映
+		// リスト適用
 		$('td.name > a[href]').each(function () {
-			let text = $(this).text().replace(/\r?\n/g, '');
-			let list = getDisableList();
-			if ($.inArray(text, list) != -1) {
+			// 非表示リストの反映
+			let name = $(this).text().replace(/\r?\n/g, '');
+			if ($.inArray(name, getDisableList()) != -1) {
 				deleteRow(this);
 			}
-		});
 
-		// お気に入りリストの反映
-		$('.favoriteMark').each(function () {
-			let button = nameFromFavoriteButton(this);
-			let list = getFavoriteList();
-			if ($.inArray(button, list) >= 0) {
+			// お気に入りリストの反映
+			if ($.inArray(name, getFavoriteList()) >= 0) {
 				// ★の色変更
-				$(this).removeClass('favoriteMark').addClass('favoritedMark');
+				$(this).next().removeClass('favoriteMark').addClass('favoritedMark');
+				// お気に入りへ移動
 				moveFavoriteRow($(this).parent().parent());
 			}
 		});
 
 		// テーブルソートの反映
-		$(function () {
-			switch (getTableOrder()) {
-				case TABLE_ORDERS.DEFAULT:
-					$('#defaultOrderRadio').prop('checked', true);
-					break;
-				case TABLE_ORDERS.ALPHABETICAL:
-					$('#alphabeticalOrderRadio').prop('checked', true);
-					reorderAlphabetical();
-					break;
-				case TABLE_ORDERS.START_TIME:
-					$('#startTimeOrderRadio').prop('checked', true);
-					reorderStartTime();
-					break;
-				case TABLE_ORDERS.ID:
-					$('#idOrderRadio').prop('checked', true);
-					reorderId();
-					break;
-			}
-		});
+		updateTableOrder();
 
 		// サムネイル表示の反映
-		$(function () {
-			let ts = getThumbnailSetting();
-			applyThumbnailMode(ts.mode);
-
-			// 横指定
-			let style = '.thumbnail { width: ' + ts.width + 'px; ';
-			if (!ts.keepAspect) {
-				// 縦指定
-				style += 'height: ' + ts.height + 'px; ';
-			}
-			style += '}';
-			GM_addStyle(style);
-		});
+		updateThumbnailSetting();
 
 		/////////////////////////////
 		// そのほかの編集
@@ -301,7 +324,7 @@
 
 		// その他欄の非表示トグルボタン
 		$('#otherToggleButton').on('click', function () {
-			toggleSection(DB_NAMES.OTHER_SECTION);
+			toggleSection(DB_NAMES.OTHER);
 		});
 
 		/////////////////////////////
@@ -343,23 +366,7 @@
 			});
 			// お気に入りリストを表示
 			$('#favoriteListText').val(getFavoriteList());
-			// テーブル並び替え順を表示
-			$(function () {
-				switch (getTableOrder()) {
-					case TABLE_ORDERS.DEFAULT:
-						$('#defaultOrderRadio').prop('checked', true);
-						break;
-					case TABLE_ORDERS.ALPHABETICAL:
-						$('#alphabeticalOrderRadio').prop('checked', true);
-						break;
-					case TABLE_ORDERS.START_TIME:
-						$('#startTimeOrderRadio').prop('checked', true);
-						break;
-					case TABLE_ORDERS.ID:
-						$('#idOrderRadio').prop('checked', true);
-						break;
-				}
-			});
+
 			// サムネイル設定を表示
 			$(function () {
 				let ts = getThumbnailSetting();
@@ -454,21 +461,16 @@
 				switch (id) {
 					case 'defaultOrderRadio':
 						setTableOrder(TABLE_ORDERS.DEFAULT);
-						reorderDefault();
 						break;
 					case 'alphabeticalOrderRadio':
 						setTableOrder(TABLE_ORDERS.ALPHABETICAL);
-						reorderAlphabetical();
 						break;
 					case 'startTimeOrderRadio':
 						setTableOrder(TABLE_ORDERS.START_TIME);
-						reorderStartTime();
 						break;
 					case 'idOrderRadio':
 						setTableOrder(TABLE_ORDERS.ID);
-						reorderId();
 						break;
-
 				}
 			});
 			// サムネイルモード切替
@@ -563,7 +565,7 @@
 	 * @return {Array.<string>}
 	 */
 	function getDisableList() {
-		if (disableList == null) {
+		if (disableList == undefined) {
 			if (GM_getValue(DB_NAMES.DISABLE_LIST) == undefined) {
 				initializeDisableListDB();
 			}
@@ -622,7 +624,7 @@
 	 * @return {Array.<string,boolean>} 非表示セクション
 	 */
 	function getDisableSection() {
-		if (disableSection == null) {
+		if (disableSection == undefined) {
 			if (GM_getValue(DB_NAMES.DISABLE_SECTION) == undefined) {
 				initializeDisableSectionDB();
 			}
@@ -658,19 +660,10 @@
 		let eventTicker = $('.ticker');
 		let ds = getDisableSection();
 
-		if (ds[DB_NAMES.FIRST_LIST]) {
-			firstListSection.toggle(false);
-		} else {
-			firstListSection.toggle(true);
-		}
+		firstListSection.toggle((ds[DB_NAMES.FIRST_LIST]) ? false : true);
+		secondListSection.toggle((ds[DB_NAMES.SECOND_LIST]) ? false : true);
 
-		if (ds[DB_NAMES.SECOND_LIST]) {
-			secondListSection.toggle(false);
-		} else {
-			secondListSection.toggle(true);
-		}
-
-		if (ds[DB_NAMES.OTHER_SECTION]) {
+		if (ds[DB_NAMES.OTHER]) {
 			otherSection.toggle(false);
 			// ボタンテキストを変更
 			otherToggleButton.val('その他の情報を展開');
@@ -680,11 +673,7 @@
 			otherToggleButton.val('その他の情報を格納');
 		}
 
-		if (ds[DB_NAMES.EVENT_TICKER]) {
-			eventTicker.toggle(false);
-		} else {
-			eventTicker.toggle(true);
-		}
+		eventTicker.toggle((ds[DB_NAMES.OTHER]) ? false : true);
 	}
 
 	/**
@@ -734,7 +723,7 @@
 	 * @return {Array.<string>} お気に入りリスト
 	 */
 	function getFavoriteList() {
-		if (FavoriteList == null) {
+		if (FavoriteList == undefined) {
 			if (GM_getValue(DB_NAMES.FAVORITE_LIST) == undefined) {
 				initializeFavoriteListDB();
 			}
@@ -878,7 +867,7 @@
 	 * @return {string} テーブル並び替え設定
 	 */
 	function getTableOrder() {
-		if (TableOrder == null) {
+		if (TableOrder == undefined) {
 			if (GM_getValue(DB_NAMES.TABLE_ORDER) == undefined) {
 				initializeTableOrderDB();
 			}
@@ -896,6 +885,58 @@
 	function setTableOrder(order) {
 		TableOrder = order;
 		GM_setValue(DB_NAMES.TABLE_ORDER, TableOrder);
+		updateTableOrder(false);
+	}
+
+	/**
+	 * テーブルのソート順を更新
+	 * @param {boolean} firstFlag 初期更新かどうか
+	 */
+	function updateTableOrder(firstFlag) {
+		firstFlag = firstFlag || true;
+		switch (getTableOrder()) {
+			case TABLE_ORDERS.DEFAULT:
+				if (firstFlag) {
+					$('#defaultOrderRadio').prop('checked', true);
+					break;
+				} else {
+					reorderDefault();
+					break;
+				}
+			case TABLE_ORDERS.ALPHABETICAL:
+				if (firstFlag) {
+					$('#alphabeticalOrderRadio').prop('checked', true);
+					reorderAlphabetical();
+					break;
+				} else {
+					if (confirm('ページを更新します')) {
+						location.reload();
+					}
+					break;
+				}
+			case TABLE_ORDERS.START_TIME:
+				if (firstFlag) {
+					$('#startTimeOrderRadio').prop('checked', true);
+					reorderStartTime();
+					break;
+				} else {
+					if (confirm('ページを更新します')) {
+						location.reload();
+					}
+					break;
+				}
+			case TABLE_ORDERS.ID:
+				if (firstFlag) {
+					$('#idOrderRadio').prop('checked', true);
+					reorderId();
+					break;
+				} else {
+					if (confirm('ページを更新します')) {
+						location.reload();
+					}
+					break;
+				}
+		}
 	}
 
 	/**
@@ -1120,7 +1161,7 @@
 	 * @return {Object} サムネイル設定
 	 */
 	function getThumbnailSetting() {
-		if (thumbnailSetting == null) {
+		if (thumbnailSetting == undefined) {
 			if (GM_getValue(DB_NAMES.THUMBNAIL_SETTING) == undefined) {
 				initializeThumbnailSetting();
 			}
@@ -1137,6 +1178,39 @@
 	 */
 	function setThumbnailSetting(setting) {
 		GM_setValue(DB_NAMES.THUMBNAIL_SETTING, setting);
+		updateThumbnailSetting(false);
+	}
+
+	/**
+	 * サムネイル表示を更新
+	 * @param {boolean} firstFlag 初期か
+	 */
+	function updateThumbnailSetting(firstFlag) {
+		firstFlag = firstFlag || true;
+
+		if (firstFlag) {
+			let ts = getThumbnailSetting();
+			applyThumbnailMode(ts.mode);
+
+			// 横指定
+			let style = '.thumbnail { width: ' + ts.width + 'px; ';
+			if (!ts.keepAspect) {
+				// 縦指定
+				style += 'height: ' + ts.height + 'px; ';
+			}
+			style += '}';
+
+			let css = $('head style:contains(".thumbnail {")');
+			if (css != undefined) {
+				css.text(style);
+			} else {
+				GM_addStyle(style);
+			}
+		} else {
+			if (confirm('ページを更新します')) {
+				location.reload();
+			}
+		}
 	}
 
 	/**
