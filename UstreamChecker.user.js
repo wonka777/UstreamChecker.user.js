@@ -9,7 +9,7 @@
 // @grant       GM_setValue
 // @grant       GM_addStyle
 // @run-at		document-idle
-// @version     0.1.5
+// @version     0.1.6
 // ==/UserScript==
 
 /////////////////////////////
@@ -42,6 +42,7 @@
 		SECOND_LIST: '2nd_list_section',
 		OTHER: 'other_section',
 		EVENT_TICKER: 'event_ticker',
+		MISC_SETTING: 'misc_setting',
 	};
 
 	/**
@@ -83,6 +84,7 @@
 	let FavoriteList;
 	let TableOrder;
 	let thumbnailSetting;
+	let miscSetting;
 
 	$(window).load(function () {
 		/////////////////////////////
@@ -134,9 +136,23 @@
 
 		// タイトル
 		let mwContent = '<h2>拡張スクリプト設定 &lt; ' + GM_info.script.name + ' version ' + GM_info.script.version + ' &gt;</h2>';
+		// 左ペイン
+		mwContent +=
+			'<div class="modal-left">' +
+			'	<ul>' +
+			'		<li id="menu-all">すべて</li>' +
+			'		<li id="menu-favorite">お気に入り</li>' +
+			'		<li id="menu-disable">非表示</li>' +
+			'		<li id="menu-sort">ソート</li>' +
+			'		<li id="menu-thumbnail">サムネイル</li>' +
+			'		<li id="menu-misc">その他の設定</li>' +
+			'	</ul>' +
+			'</div>';
+		// 右ペイン
+		mwContent += '<div class="modal-right">';
 		// お気に入りリスト
 		mwContent +=
-			'<div class="modal-item">' +
+			'<div class="modal-item" id="modal-favorite">' +
 			'	<h3>お気に入りリスト</h3>' +
 			'	<textarea value="" id="favoriteListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" />' +
 			'	<input type="button" class="button" id="favoriteListSaveButton" value="保存">' +
@@ -144,7 +160,7 @@
 			'</div>';
 		// 非表示リスト
 		mwContent +=
-			'<div class="modal-item">' +
+			'<div class="modal-item" id="modal-disableList">' +
 			'	<h3>非表示リスト</h3>' +
 			'	<textarea value="" id="disableListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" />' +
 			'	<input type="button" class="button" id="disableListSaveButton" value="保存">' +
@@ -152,7 +168,7 @@
 			'</div>';
 		// 非表示セクション
 		mwContent +=
-			'<div class="modal-item">' +
+			'<div class="modal-item" id="modal-disableSection">' +
 			'	<h3>部分非表示(チェックすると非表示)</h3>' +
 			'	<div class="modal-item">' +
 			'		<input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label>' +
@@ -166,7 +182,7 @@
 			'</div>';
 		// ソート順
 		mwContent +=
-			'<div class="modal-item">' +
+			'<div class="modal-item" id="modal-sort">' +
 			'	<h3>ソート順</h3>' +
 			'	<input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label>' +
 			'	<input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label>' +
@@ -175,7 +191,7 @@
 			'</div>';
 		// サムネイル設定
 		mwContent +=
-			'<div class="modal-item">' +
+			'<div class="modal-item" id="modal-thumbnail">' +
 			'	<h3>サムネイル表示</h3>' +
 			'	<div class="modal-item thumbnailMode">' +
 			'		<input type="radio" class="thumbnailCustomRadio" id="thumbnailDefault" name="thumbnailRadio"><label for="thumbnailDefault">デフォルト</label>' +
@@ -196,12 +212,28 @@
 			'			</p>' +
 			'		</div>' +
 			'		<div class="thumbnailSample-item">' +
-			'			<img id="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png">' +
-			'			<figcaption>50px x 50px</figcaption>' +
+			'			<div class="thumbnailSampleImage">' +
+			'				<img class="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png">' +
+			'				<figcaption>50px : 50px</figcaption>' +
+			'			</div>' +
 			'		</div>' +
 			'	</div>' +
 			'</div>';
-
+		// その他の機能
+		mwContent +=
+			'<div class="modal-item" id="modal-misc">' +
+			'	<h3>その他の機能</h3>' +
+			'	<div class="modal-item">' +
+			'		<h3>トピック</h3>' +
+			'		<input type="checkbox" class="miscCheckbox" id="topicLinefeed"><label for="topicLinefeed">トピックを一つずつ改行して表示する</label><br>' +
+			'		<input type="checkbox" class="miscCheckbox" id="topicRestore"><label for="topicRestore">省略されているトピックを復元</label>' +
+			'	</div>' +
+			'	<div class="modal-item">' +
+			'		<h3>リンク変更</h3>' +
+			'		<input type="checkbox" class="miscCheckbox" id="niconamaLinkChange"><label for="niconamaLinkChange">ニコ生のURLをlv123456789からco123456789に変更</label>' +
+			'	</div>' +
+			'</div>';
+		mwContent += '</div>';
 		// 閉じるボタン
 		mwContent += '<input type="button" class="button" id="modal-close" value="閉じる">';
 		mw.append(mwContent);
@@ -212,17 +244,24 @@
 
 		// modal-window用CSS
 		addCSS += '.modal-content {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff;}' +
-			'.modal-item {border: medium solid #CCC; padding: 10px; border-radius: 10px; margin: 10px;}' +
-			'.modal-item:after {clear: both; content: ""; display: table;}' +
-			'.thumbnailSample-item {float: left; text-align: center;}' +
+			'.modal-left {display: table-cell; width: 190px; border-right: 8px dotted #CCC;}' +
+			'.modal-right {display: table-cell; width: inherit;}' +
+			'.modal-left ul {list-style-type: none; padding: 10px 0px 10px 5px;}' +
+			'.modal-left li {border: 1px solid #9F99A3; border-radius: 6px; background-color: #EEEEEE; padding: 3px 10px; text-decoration: none; color: #333; width: 150px; margin: 2px 0px; text-align: left; font-size: 18px;}' +
+			'.modal-left li:hover {border: 1px solid #8593A9; background-color: #9EB7DD;}' +
+			'.selected-menu {background-color: #FFF6CA !important;}' +
+			'.modal-item {border: medium solid #CCC; padding: 10px; border-radius: 10px; margin: 10px; border-collapse: separate; border-spacing: 10px 0px;}' +
+			'.thumbnailSample-item {display: table-cell; width: 260px; text-align: center; vertical-align: middle; border: medium solid #CCC; padding: 10px; border-radius: 10px;}' +
 			'.thumbnailSample-item > * {margin: 2px;}' +
+			'div.thumbnailSampleImage {background: #CCC;}' +
 			'input[type=number] {text-align: right;}';
 
 		// modal-overlay用CSS
 		addCSS += '.modal-overlay {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}';
 
-		// ボタン用CSS
-		addCSS += '.button {width: 100px; margin: 2px; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
+		// ボタン装飾用CSS
+		addCSS +=
+			'.button {width: 100px; margin: 2px 2px 2px auto; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
 			'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
 			'.button:active {top: 3px; box-shadow: none;}';
 
@@ -253,35 +292,41 @@
 		});
 
 		// テーブルソートの反映
-		updateTableOrder();
+		updateTableOrder(true);
 
 		// サムネイル表示の反映
-		updateThumbnailSetting();
+		updateThumbnailSetting(true);
 
 		/////////////////////////////
 		// そのほかの編集
 		/////////////////////////////
 
 		// トピックを改行して表示
-		$('td.topic > img+img').before(function () {
-			$(this).before('<br>');
-		});
+		if (getMiscSetting().topicLinefeed) {
+			$('td.topic > img+img').before(function () {
+				$(this).before('<br>');
+			});
+		}
 
 		// 省略されているトピックを復活
-		$('p.arrow_box').each(function () {
-			// 省略されていないトピックを取得
-			let topic = $(this).html().replace(/^<br>/g, '').replace(/<br>$/g, '');
-			// 反映
-			$(this).parent().html(topic);
-		});
+		if (getMiscSetting().topicRestore) {
+			$('p.arrow_box').each(function () {
+				// 省略されていないトピックを取得
+				let topic = $(this).html().replace(/^<br>/g, '').replace(/<br>$/g, '');
+				// 反映
+				$(this).parent().html(topic);
+			});
+		}
 
 		// ニコ生リンク修正
-		$('td.status img[alt="nico"]').each(function () {
-			let url = $(this).parent('a').attr('href').substring(0, 32) +
-				$(this).closest('.status').nextAll('.archives').find('img[alt="nico"]').parent().attr('href').split('?')[0].substr(38);
+		if (getMiscSetting().niconamaLinkChange) {
+			$('td.status img[alt="nico"]').each(function () {
+				let url = $(this).parent('a').attr('href').substring(0, 32) +
+					$(this).closest('.status').nextAll('.archives').find('img[alt="nico"]').parent().attr('href').split('?')[0].substr(38);
 
-			$(this).parent('a').attr('href', url);
-		});
+				$(this).parent('a').attr('href', url);
+			});
+		}
 
 		// イベントバーを移動
 		$('.ticker').insertBefore('.noblk:first');
@@ -332,6 +377,12 @@
 
 		// 「.modal-open」をクリック
 		$('.modal-open').on('click', function () {
+			// 重複を防ぐ
+			if ($('div').hasClass('modal-overlay')) {
+				$('.modal-overlay').trigger('click');
+				return;
+			}
+
 			// オーバーレイ用の要素を追加
 			$('body').append('<div class="modal-overlay"></div>');
 			// モーダルコンテンツのIDを取得
@@ -347,6 +398,11 @@
 			/////////////////////////////
 			// 設定ウィンドウに設定内容を表示
 			/////////////////////////////
+
+			// 左メニューのデフォルト
+			if (!$('li').hasClass('selected-menu')) {
+				$('#menu-all').addClass('selected-menu');
+			}
 
 			// 非表示リストを表示
 			$('#disableListText').val(getDisableList());
@@ -366,29 +422,10 @@
 			// お気に入りリストを表示
 			$('#favoriteListText').val(getFavoriteList());
 
-			// サムネイル設定を表示
-			$(function () {
-				let ts = getThumbnailSetting();
-
-				switch (ts.mode) {
-					case THUMBNAIL_MODES.DEFAULT:
-						$('#thumbnailDefault').prop('checked', true);
-						$('.thumbnailSize').hide();
-						return;
-					case THUMBNAIL_MODES.MOUSE_OVER:
-						$('#thumbnailMouseOver').prop('checked', true);
-						break;
-					case THUMBNAIL_MODES.ALLWAYS:
-						$('#thumbnailAlways').prop('checked', true);
-						break;
-				}
-				$('#thumbnailAutoRatio').prop('checked', ts.keepAspect);
-				$('#thumbnailWidth').val(ts.width);
-				$('#thumbnailHeight').val(ts.height);
-				setSampleImage(ts.keepAspect, ts.width, ts.height);
-				// サンプル画像を設定
-				$('#thumbnailSampleImage').attr('src', $('img[onmouseover]').first().attr('onmouseover').split('\'')[1]);
-			});
+			// その他の設定を表示
+			$('#topicLinefeed').prop('checked', getMiscSetting().topicLinefeed);
+			$('#topicRestore').prop('checked', getMiscSetting().topicRestore);
+			$('#niconamaLinkChange').prop('checked', getMiscSetting().niconamaLinkChange);
 
 			/////////////////////////////
 			// 設定ウィンドウ内の初期化ボタン
@@ -498,7 +535,6 @@
 					ts.keepAspect = false;
 				}
 				setThumbnailSetting(ts);
-				setSampleImage(ts.keepAspect, ts.width, ts.height);
 			});
 			// サムネイルサイズ変更
 			$('#thumbnailWidth, #thumbnailHeight').on('change', function () {
@@ -506,8 +542,36 @@
 				ts.width = Number($('#thumbnailWidth').val());
 				ts.height = Number($('#thumbnailHeight').val());
 
-				setSampleImage(ts.keepAspect, Number($('#thumbnailWidth').val()), Number($('#thumbnailHeight').val()));
+				setThumbnailSetting(ts);
 			});
+
+			// 左メニューをクリックで右ペインを変更
+			$('li[id^="menu"]').on('click', function () {
+				// メニュー背景
+				$('.selected-menu').removeClass('selected-menu');
+				$(this).addClass('selected-menu');
+				// 右ペインの変更
+				let id = $(this).attr('id');
+				modalSelectRightPane(id);
+			});
+
+			// その他の設定のチェックボックス
+			$('#topicLinefeed').on('change', function () {
+				miscSetting.topicLinefeed = !miscSetting.topicLinefeed;
+				setMiscSetting(miscSetting);
+			});
+			$('#topicRestore').on('change', function () {
+				miscSetting.topicRestore = !miscSetting.topicRestore;
+				setMiscSetting(miscSetting);
+			});
+			$('#niconamaLinkChange').on('change', function () {
+				miscSetting.niconamaLinkChange = !miscSetting.niconamaLinkChange;
+				setMiscSetting(miscSetting);
+			});
+
+			/////////////////////////////
+			// モーダルウィンドウ処理
+			/////////////////////////////
 
 			// 「.modal-overlay」あるいは「.modal-close」をクリック
 			$('.modal-overlay, #modal-close').off().on('click', function () {
@@ -531,11 +595,49 @@
 				// モーダルコンテンツの表示位置を取得
 				let x = ($(window).width() - modal.outerWidth(true)) / 2;
 				let y = 50; //($(window).height() - modal.outerHeight(true)) / 2;
+				let width = $(window).width() * 0.75;
 
 				// モーダルコンテンツの表示位置を設定
 				modal.css({
-					'left': x + 'px', 'top': y + 'px',
+					'left': x + 'px',
+					'top': y + 'px',
+					'width': width + 'px',
 				});
+			}
+
+			/**
+			 * 右ペインの表示項目を選択
+			 * @param {string} pain ペイン内divのid
+			 */
+			function modalSelectRightPane(pain) {
+				let menuAll = $('#modal-favorite, #modal-disableList, #modal-disableSection, #modal-sort, #modal-thumbnail, #modal-misc');
+
+				switch (pain) {
+					case 'menu-favorite':
+						menuAll.toggle(false);
+						$('#modal-favorite').toggle(true);
+						break;
+					case 'menu-disable':
+						menuAll.toggle(false);
+						$('#modal-disableList, #modal-disableSection').toggle(true);
+						break;
+					case 'menu-sort':
+						menuAll.toggle(false);
+						$('#modal-sort').toggle(true);
+						break;
+					case 'menu-thumbnail':
+						menuAll.toggle(false);
+						$('#modal-thumbnail').toggle(true);
+						break;
+					case 'menu-misc':
+						menuAll.toggle(false);
+						$('#modal-misc').toggle(true);
+						break;
+					case 'menu-all':
+					default:
+						menuAll.toggle(true);
+						break;
+				}
 			}
 		});
 	});
@@ -548,13 +650,14 @@
 	 * 非表示リストを初期化
 	 */
 	function initializeDisableListDB() {
-		if (confirm('非表示リストを初期化しますか？')) {
-			GM_setValue(DB_NAMES.DISABLE_LIST, []);
-			disableList = GM_getValue(DB_NAMES.DISABLE_LIST);
-			//console.log(DISABLE_LIST_DB_NAME + ' initialize');
-		} else {
-			//console.log(DISABLE_LIST_DB_NAME + ' initialize canceled');
+		if (GM_getValue(DB_NAMES.DISABLE_LIST) != undefined) {
+			if (!confirm('非表示リストを初期化しますか？')) {
+				return;
+			}
 		}
+
+		GM_setValue(DB_NAMES.DISABLE_LIST, []);
+		disableList = GM_getValue(DB_NAMES.DISABLE_LIST);
 	}
 
 	/**
@@ -600,20 +703,21 @@
 	 * 非表示セクションデータベースを初期化
 	 */
 	function initializeDisableSectionDB() {
-		if (confirm('非表示リストを初期化しますか？')) {
-			let dsInitial = {
-				FIRST_LIST_SECTION_DB_NAME: false,
-				SECOND_LIST_SECTION_DB_NAME: false,
-				OTHER_SECTION_DB_NAME: true,
-				EVENT_TICKER_DB_NAME: false,
-			};
-
-			GM_setValue(DB_NAMES.DISABLE_SECTION, dsInitial);
-			disableSection = GM_getValue(DB_NAMES.DISABLE_SECTION);
-			//console.log(DISABLE_SECTION_DB_NAME + ' initialize');
-		} else {
-			//console.log(DISABLE_SECTION_DB_NAME + ' initialize canceled');
+		if (GM_getValue(DB_NAMES.DISABLE_SECTION) != undefined) {
+			if (!confirm('非表示リストを初期化しますか？')) {
+				return;
+			}
 		}
+
+		let dsInitial = {
+			FIRST_LIST_SECTION_DB_NAME: false,
+			SECOND_LIST_SECTION_DB_NAME: false,
+			OTHER_SECTION_DB_NAME: true,
+			EVENT_TICKER_DB_NAME: false,
+		};
+
+		GM_setValue(DB_NAMES.DISABLE_SECTION, dsInitial);
+		disableSection = GM_getValue(DB_NAMES.DISABLE_SECTION);
 	}
 
 	/**
@@ -708,11 +812,14 @@
 	 * お気に入りリストを初期化
 	 */
 	function initializeFavoriteListDB() {
-		if (confirm('お気に入りリストを初期化しますか？')) {
-			GM_setValue(DB_NAMES.FAVORITE_LIST, []);
-			FavoriteList = GM_getValue(DB_NAMES.FAVORITE_LIST);
-			//console.log(FAVORITE_LIST_DB_NAME + ' initialize');
+		if (GM_getValue(DB_NAMES.FAVORITE_LIST) != undefined) {
+			if (!confirm('お気に入りリストを初期化しますか？')) {
+				return;
+			}
 		}
+
+		GM_setValue(DB_NAMES.FAVORITE_LIST, []);
+		FavoriteList = GM_getValue(DB_NAMES.FAVORITE_LIST);
 	}
 
 	/**
@@ -852,11 +959,14 @@
 	 * テーブル並び替え設定を初期化
 	 */
 	function initializeTableOrderDB() {
-		if (confirm('並び替えを初期化しますか？')) {
-			GM_setValue(DB_NAMES.TABLE_ORDER, TABLE_ORDERS.DEFAULT);
-			TableOrder = GM_getValue(DB_NAMES.TABLE_ORDER);
-			//console.log(TABLE_ORDER_DB_NAME + ' initialize');
+		if (GM_getValue(DB_NAMES.TABLE_ORDER) != undefined) {
+			if (!confirm('並び替えを初期化しますか？')) {
+				return;
+			}
 		}
+
+		GM_setValue(DB_NAMES.TABLE_ORDER, TABLE_ORDERS.DEFAULT);
+		TableOrder = GM_getValue(DB_NAMES.TABLE_ORDER);
 	}
 
 	/**
@@ -890,7 +1000,6 @@
 	 * @param {boolean} firstFlag 初期更新かどうか
 	 */
 	function updateTableOrder(firstFlag) {
-		firstFlag = firstFlag || true;
 		switch (getTableOrder()) {
 			case TABLE_ORDERS.DEFAULT:
 				if (firstFlag) {
@@ -1141,16 +1250,20 @@
 	 * サムネイル設定を初期化
 	 */
 	function initializeThumbnailSetting() {
-		if (confirm('サムネイル設定を初期化しますか？')) {
-			GM_setValue(DB_NAMES.THUMBNAIL_SETTING, {
-				mode: THUMBNAIL_MODES.DEFAULT,
-				keepAspect: true,
-				width: 50,
-				height: 50,
-			});
-
-			thumbnailSetting = GM_getValue(DB_NAMES.THUMBNAIL_SETTING);
+		if (GM_getValue(DB_NAMES.THUMBNAIL_SETTING) != undefined) {
+			if (!confirm('サムネイル設定を初期化しますか？')) {
+				return;
+			}
 		}
+
+		GM_setValue(DB_NAMES.THUMBNAIL_SETTING, {
+			mode: THUMBNAIL_MODES.DEFAULT,
+			keepAspect: true,
+			width: 50,
+			height: 50,
+		});
+
+		thumbnailSetting = GM_getValue(DB_NAMES.THUMBNAIL_SETTING);
 	}
 
 	/**
@@ -1183,11 +1296,10 @@
 	 * @param {boolean} firstFlag 初期か
 	 */
 	function updateThumbnailSetting(firstFlag) {
-		firstFlag = firstFlag || true;
-
 		if (firstFlag) {
 			let ts = getThumbnailSetting();
 			applyThumbnailMode(ts.mode);
+
 
 			// 横指定
 			let style = '.thumbnail { width: ' + ts.width + 'px; ';
@@ -1198,11 +1310,46 @@
 			style += '}';
 
 			let css = $('head style:contains(".thumbnail {")');
-			if (css != undefined) {
+			if (css.length != 0) {
 				css.text(style);
 			} else {
 				GM_addStyle(style);
 			}
+
+			switch (ts.mode) {
+				case THUMBNAIL_MODES.DEFAULT:
+					$('#thumbnailDefault').prop('checked', true);
+					$('.thumbnailSize').hide();
+					return;
+				case THUMBNAIL_MODES.MOUSE_OVER:
+					$('#thumbnailMouseOver').prop('checked', true);
+					break;
+				case THUMBNAIL_MODES.ALLWAYS:
+					$('#thumbnailAlways').prop('checked', true);
+					break;
+			}
+
+			$('#thumbnailAutoRatio').prop('checked', ts.keepAspect);
+			$('#thumbnailWidth').val(ts.width);
+			$('#thumbnailHeight').val(ts.height);
+
+			if (ts.keepAspect) {
+				$('img.thumbnailSampleImage').attr('width', ts.width).removeAttr('height').next().text(ts.width + 'px : ' + 'auto');
+
+				$('#sampleImageHeight').hide();
+			} else {
+				$('img.thumbnailSampleImage').attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px : ' + ts.height + 'px');
+				$('#sampleImageHeight').show();
+			}
+			$('div.thumbnailSampleImage').css(
+				{
+					'width': ts.width,
+					'height': ts.width * 0.5625 + 30 + 'px',
+				}
+			);
+
+			// サンプル画像を設定
+			$('img.thumbnailSampleImage').attr('src', $('img[onmouseover]').first().attr('onmouseover').split('\'')[1]);
 		} else {
 			if (confirm('ページを更新します')) {
 				location.reload();
@@ -1247,26 +1394,51 @@
 		}
 	}
 
-	/**
-	 * サンプル画像を設定
-	 * @param {boolean} keepAspect アスペクト比を保持するか
-	 * @param {number} width 横
-	 * @param {number} height 縦
-	 */
-	function setSampleImage(keepAspect, width, height) {
-		let ts = getThumbnailSetting();
-		ts.keepAspect = keepAspect;
-		ts.width = width;
-		ts.height = height;
-		setThumbnailSetting(ts);
+	/////////////////////////////
+	// サムネイル設定
+	/////////////////////////////
 
-		if (ts.keepAspect) {
-			$('#thumbnailSampleImage').attr('width', ts.width).removeAttr('height').next().text(ts.width + 'px x ' + 'auto');
-			$('#sampleImageHeight').hide();
-		} else {
-			$('#thumbnailSampleImage').attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px x ' + ts.height + 'px');
-			$('#sampleImageHeight').show();
+	/**
+	 * その他の設定を初期化
+	 */
+	function initializeMiscSettingDB() {
+		if (GM_getValue(DB_NAMES.MISC_SETTING) != undefined) {
+			if (!confirm('その他の設定を初期化しますか？')) {
+				return;
+			}
 		}
+
+		GM_setValue(DB_NAMES.MISC_SETTING, {
+			topicLinefeed: false,
+			topicRestore: false,
+			niconamaLinkChange: false,
+		});
+
+		miscSetting = GM_getValue(DB_NAMES.MISC_SETTING);
+	}
+
+	/**
+	 * その他の設定を取得
+	 * @return {object} その他の設定
+	 */
+	function getMiscSetting() {
+		if (miscSetting == undefined) {
+			if (GM_getValue(DB_NAMES.MISC_SETTING) == undefined) {
+				initializeMiscSettingDB();
+			}
+
+			miscSetting = GM_getValue(DB_NAMES.MISC_SETTING);
+		}
+
+		return miscSetting;
+	}
+
+	/**
+	 * その他の設定を設定
+	 * @param {object} setting その他の設定
+	 */
+	function setMiscSetting(setting) {
+		GM_setValue(DB_NAMES.MISC_SETTING, setting);
 	}
 
 	/////////////////////////////
