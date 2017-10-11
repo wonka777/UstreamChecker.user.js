@@ -8,8 +8,8 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @run-at		document-idle
-// @version     0.1.6
+// @run-at      document-idle
+// @version     0.1.7
 // ==/UserScript==
 
 /////////////////////////////
@@ -23,8 +23,9 @@
 // 特定の配信サイトを非表示
 // トピック内のキーワードで非表示
 
-(function () {
+(function() {
 	'use strict';
+
 	/////////////////////////////
 	// 定数
 	/////////////////////////////
@@ -86,28 +87,28 @@
 	let thumbnailSetting;
 	let miscSetting;
 
-	$(window).load(function () {
+	/////////////////////////////
+	// ページ読み込み後
+	/////////////////////////////
+
+	$(window).load(function() {
 		/////////////////////////////
-		// ボタンの追加
+		// ボタンの処理
 		/////////////////////////////
 
-		// お気に入りボタンの追加
+		// お気に入りボタン
 		let buttonContent = '<a class="favoriteMark" title="お気に入り">★</a>';
-		// 非表示ボタンの追加
+		// 非表示ボタン
 		buttonContent += '<a class="disableButton" title="非表示">×</a>';
+		// ボタンを挿入
 		$('td.name > a').after(buttonContent);
-
-		// デバッグボタン
-		// $('div#topMenuBar ul li:first-child').prepend('<input type="button" class="debug_button" value="デバッグ">');
 
 		// その他の情報開閉トグルボタン
 		$('.noblk').last().before('<br><input type="button" id="otherToggleButton" value="その他の情報を格納">');
 		// その他の情報をまとめる
 		$('#otherToggleButton').nextAll().wrapAll('<div id="otherToggle" />');
 
-		/////////////////////////////
 		// ボタン用CSS
-		/////////////////////////////
 		let addCSS = '.favoriteMark, .disableButton, .favoritedMark {cursor: pointer; margin: 2px; font-weight: bold;}' +
 			' .favoriteMark {color:' + COLORS.UNFAVORITE_MARK + '}' +
 			' .disableButton {color: ' + COLORS.UNDISABLE_MARK + '}' +
@@ -117,8 +118,14 @@
 			' .disableButton:hover {color:' + COLORS.DISABLE_MARK + ' !important;}' +
 			' .favoritedMark:hover {color:' + COLORS.UNFAVORITE_MARK + ' !important;}';
 
+		// ボタン装飾用CSS
+		addCSS +=
+			'.button {width: 100px; margin: 2px 2px 2px auto; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
+			'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
+			'.button:active {top: 3px; box-shadow: none;}';
+
 		/////////////////////////////
-		// お気に入り用CSS
+		// テーブル用CSS
 		/////////////////////////////
 
 		addCSS += 'tr.favorite > td {background-color: ' + COLORS.FAVORITE_ROW + ' !important;}';
@@ -127,16 +134,15 @@
 		// モーダルウィンドウ
 		/////////////////////////////
 
-		// モーダルウィンドウボタン
+		// モーダルウィンドウボタンを挿入
 		$('#topMenuBar > ul').append('<li><a data-target="wm" class="modal-open" style="cursor: pointer;">拡張スクリプト設定</a></li>');
-
-		// モーダルウィンドウ本体
+		// モーダルウィンドウ本体を挿入
 		$('body').append('<div id="mw" class="modal-content"></div>');
 		let mw = $('div.modal-content');
 
 		// タイトル
 		let mwContent = '<h2>拡張スクリプト設定 &lt; ' + GM_info.script.name + ' version ' + GM_info.script.version + ' &gt;</h2>';
-		// 左ペイン
+		// 左メニュー
 		mwContent +=
 			'<div class="modal-left">' +
 			'	<ul>' +
@@ -220,6 +226,9 @@
 			'	</div>' +
 			'</div>';
 		// その他の機能
+		Object.keys(modalContents.rightPane.misc).forEach(function(key) {
+			console.log();
+		}, modalContents.rightPane.misc);
 		mwContent +=
 			'<div class="modal-item" id="modal-misc">' +
 			'	<h3>その他の機能</h3>' +
@@ -236,11 +245,76 @@
 		mwContent += '</div>';
 		// 閉じるボタン
 		mwContent += '<input type="button" class="button" id="modal-close" value="閉じる">';
-		mw.append(mwContent);
 
-		/////////////////////////////
-		// モーダルウィンドウ用CSS
-		/////////////////////////////
+		let modalContents = {
+			leftMenu: {
+				class: 'modal-left',
+				menuAll: {
+					id: 'menu-all',
+					value: 'すべて',
+				},
+				menuFavorite: {
+					id: 'menu-favorite',
+					value: 'お気に入り',
+				},
+				menuDisable: {
+					id: 'menu-disable',
+					value: '非表示',
+				},
+				menuSort: {
+					id: 'menu-sort',
+					value: 'ソート',
+				},
+				menuThumbnail: {
+					id: 'menu-thumbnail',
+					value: 'サムネイル',
+				},
+				menuMisc: {
+					id: 'menu-misc',
+					value: 'その他の設定',
+				},
+			},
+			rightPane: {
+				class: 'modal-right',
+				misc: {
+					class: 'modal-item',
+					id: 'modal-misc',
+					title: {
+						type: 'title',
+						value: 'その他の機能',
+					},
+					topic: {
+						title: {
+							type: 'title',
+							value: 'トピック',
+						},
+						topicLinefeed: {
+							type: 'checkbox',
+							class: 'miscCheckbox',
+							id: 'topicLinefeed',
+							label: 'トピックを一つずつ改行して表示する',
+						},
+						topicRestore: {
+							type: 'checkbox',
+							class: 'miscCheckbox',
+							id: 'topicRestore',
+							label: '省略されているトピックを復元',
+						},
+					},
+					link: {
+						niconamaLinkChange: {
+							type: 'checkbox',
+							class: 'miscCheckbox',
+							id: 'niconamaLinkChange',
+							label: 'ニコ生のURLを個別番号(lv123456789)からコミュニティ番号(co123456789)に変更',
+						},
+					},
+				},
+			},
+		};
+
+		// 挿入
+		mw.append(mwContent);
 
 		// modal-window用CSS
 		addCSS += '.modal-content {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff;}' +
@@ -259,12 +333,7 @@
 		// modal-overlay用CSS
 		addCSS += '.modal-overlay {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}';
 
-		// ボタン装飾用CSS
-		addCSS +=
-			'.button {width: 100px; margin: 2px 2px 2px auto; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
-			'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
-			'.button:active {top: 3px; box-shadow: none;}';
-
+		// CSSをまとめて設定
 		GM_addStyle(addCSS);
 
 		/////////////////////////////
@@ -275,7 +344,7 @@
 		updateDisableSection();
 
 		// リスト適用
-		$('td.name > a[href]').each(function () {
+		$('td.name > a[href]').each(function() {
 			// 非表示リストの反映
 			let name = $(this).text().replace(/\r?\n/g, '');
 			if ($.inArray(name, getDisableList()) != -1) {
@@ -297,20 +366,16 @@
 		// サムネイル表示の反映
 		updateThumbnailSetting(true);
 
-		/////////////////////////////
-		// そのほかの編集
-		/////////////////////////////
-
 		// トピックを改行して表示
 		if (getMiscSetting().topicLinefeed) {
-			$('td.topic > img+img').before(function () {
+			$('td.topic > img+img').before(function() {
 				$(this).before('<br>');
 			});
 		}
 
 		// 省略されているトピックを復活
 		if (getMiscSetting().topicRestore) {
-			$('p.arrow_box').each(function () {
+			$('p.arrow_box').each(function() {
 				// 省略されていないトピックを取得
 				let topic = $(this).html().replace(/^<br>/g, '').replace(/<br>$/g, '');
 				// 反映
@@ -320,7 +385,7 @@
 
 		// ニコ生リンク修正
 		if (getMiscSetting().niconamaLinkChange) {
-			$('td.status img[alt="nico"]').each(function () {
+			$('td.status img[alt="nico"]').each(function() {
 				let url = $(this).parent('a').attr('href').substring(0, 32) +
 					$(this).closest('.status').nextAll('.archives').find('img[alt="nico"]').parent().attr('href').split('?')[0].substr(38);
 
@@ -336,7 +401,7 @@
 		/////////////////////////////
 
 		// 非表示ボタン
-		$('.disableButton').on('click', function () {
+		$('.disableButton').on('click', function() {
 			if (confirm('[' + nameFromDisableButton($(this)) + ']を非表示にしますか？')) {
 				// OK
 				addDisableList(nameFromDisableButton($(this)));
@@ -348,7 +413,7 @@
 		});
 
 		// お気に入りボタン
-		$(document).on('click', '.favoriteMark', function () {
+		$(document).on('click', '.favoriteMark', function() {
 			// リストにない
 			addFavoriteList(nameFromFavoriteButton(this));
 			$(this).removeClass('favoriteMark').addClass('favoritedMark');
@@ -356,7 +421,7 @@
 			moveFavoriteRow($(this).parent().parent());
 		});
 		// お気に入り解除ボタン
-		$(document).on('click', '.favoritedMark', function () {
+		$(document).on('click', '.favoritedMark', function() {
 			let index = $.inArray(nameFromFavoriteButton(this), getFavoriteList());
 			// リストから削除
 			removeFavoriteList(index);
@@ -367,16 +432,16 @@
 		});
 
 		// その他欄の非表示トグルボタン
-		$('#otherToggleButton').on('click', function () {
+		$('#otherToggleButton').on('click', function() {
 			toggleSection(DB_NAMES.OTHER);
 		});
 
 		/////////////////////////////
-		// 設定ウィンドウ
+		// モーダルウィンドウイベント
 		/////////////////////////////
 
 		// 「.modal-open」をクリック
-		$('.modal-open').on('click', function () {
+		$('.modal-open').on('click', function() {
 			// 重複を防ぐ
 			if ($('div').hasClass('modal-overlay')) {
 				$('.modal-overlay').trigger('click');
@@ -396,7 +461,7 @@
 			modal.fadeIn('slow');
 
 			/////////////////////////////
-			// 設定ウィンドウに設定内容を表示
+			// モーダルウィンドウに設定内容を表示
 			/////////////////////////////
 
 			// 左メニューのデフォルト
@@ -404,14 +469,11 @@
 				$('#menu-all').addClass('selected-menu');
 			}
 
-			// 非表示リストを表示
+			// 非表示リストの中身を表示
 			$('#disableListText').val(getDisableList());
-			// 非表示セクションを反映
-			$('.disableSectionCheckbox').each(function () {
-				let key = $(this).attr('id');
-				let ds = getDisableSection();
-
-				if (ds[key]) {
+			// 非表示セクションのチェックボックスを反映
+			$('.disableSectionCheckbox').each(function() {
+				if (getDisableSection()[$(this).attr('id')]) {
 					// チェックあり
 					$(this).prop('checked', true);
 				} else {
@@ -419,7 +481,7 @@
 					$(this).prop('checked', false);
 				}
 			});
-			// お気に入りリストを表示
+			// お気に入りリストの中身を表示
 			$('#favoriteListText').val(getFavoriteList());
 
 			// その他の設定を表示
@@ -432,23 +494,21 @@
 			/////////////////////////////
 
 			// 非表示リストを初期化ボタン
-			$('#disableListInitializeButton').on('click', function () {
+			$('#disableListInitializeButton').on('click', function() {
 				initializeDisableListDB();
 				$('disableListText').val(getDisableList());
 			});
 			// お気に入りリストを初期化
-			$('#favoriteListInitializeButton').on('click', function () {
+			$('#favoriteListInitializeButton').on('click', function() {
 				initializeFavoriteListDB();
 				$('#favoriteListText').val(getFavoriteList());
 			});
 			// 非表示セクションリストを初期化
-			$('#disableSectionInitializeButton').on('click', function () {
+			$('#disableSectionInitializeButton').on('click', function() {
 				initializeDisableSectionDB();
-				$('.disableSectionCheckbox').each(function () {
-					let key = $(this).attr('id');
-					let ds = getDisableSection();
-
-					if (ds[key]) {
+				// チェックボックスを再反映
+				$('.disableSectionCheckbox').each(function() {
+					if (getDisableSection()[$(this).attr('id')]) {
 						// チェックあり
 						$(this).prop('checked', true);
 					} else {
@@ -463,7 +523,7 @@
 			/////////////////////////////
 
 			// 非表示リストを保存ボタン
-			$('#disableListSaveButton').on('click', function () {
+			$('#disableListSaveButton').on('click', function() {
 				if (confirm('非表示リストを保存しますか？')) {
 					// OK
 					let dlist = $('#disableListText').val().split(',');
@@ -471,7 +531,7 @@
 				}
 			});
 			// 非表示セクションのチェックボックス
-			$('.disableSectionCheckbox').on('change', function () {
+			$('.disableSectionCheckbox').on('change', function() {
 				let id = $(this).attr('id');
 
 				if ($(this).is(':checked')) {
@@ -483,7 +543,7 @@
 				}
 			});
 			// お気に入りリストを保存ボタン
-			$('#favoriteListSaveButton').on('click', function () {
+			$('#favoriteListSaveButton').on('click', function() {
 				if (confirm('お気に入りリストを保存しますか？')) {
 					// OK
 					let flist = $('#favoriteListText').val().split(',');
@@ -491,7 +551,7 @@
 				}
 			});
 			// テーブル並び替え切り替え
-			$('.orderRadio').on('change', function () {
+			$('.orderRadio').on('change', function() {
 				let id = $(this).attr('id');
 
 				switch (id) {
@@ -510,9 +570,10 @@
 				}
 			});
 			// サムネイルモード切替
-			$('.thumbnailCustomRadio').on('change', function () {
+			$('.thumbnailCustomRadio').on('change', function() {
 				let ts = getThumbnailSetting();
 				let tsMode = $(this).attr('id');
+
 				switch (tsMode) {
 					case $('#thumbnailDefault').attr('id'):
 						ts.mode = THUMBNAIL_MODES.DEFAULT;
@@ -524,20 +585,23 @@
 						ts.mode = THUMBNAIL_MODES.ALLWAYS;
 						break;
 				}
+
 				setThumbnailSetting(ts);
 			});
 			// サムネイルサイズアスペクト比保持
-			$('#thumbnailAutoRatio').on('change', function () {
+			$('#thumbnailAutoRatio').on('change', function() {
 				let ts = getThumbnailSetting();
+
 				if ($(this).prop('checked')) {
 					ts.keepAspect = true;
 				} else {
 					ts.keepAspect = false;
 				}
+
 				setThumbnailSetting(ts);
 			});
 			// サムネイルサイズ変更
-			$('#thumbnailWidth, #thumbnailHeight').on('change', function () {
+			$('#thumbnailWidth, #thumbnailHeight').on('change', function() {
 				let ts = getThumbnailSetting();
 				ts.width = Number($('#thumbnailWidth').val());
 				ts.height = Number($('#thumbnailHeight').val());
@@ -546,45 +610,45 @@
 			});
 
 			// 左メニューをクリックで右ペインを変更
-			$('li[id^="menu"]').on('click', function () {
-				// メニュー背景
+			$('li[id^="menu"]').on('click', function() {
+				// クラス切替
 				$('.selected-menu').removeClass('selected-menu');
 				$(this).addClass('selected-menu');
+
 				// 右ペインの変更
-				let id = $(this).attr('id');
-				modalSelectRightPane(id);
+				modalSelectRightPane($(this).attr('id'));
 			});
 
 			// その他の設定のチェックボックス
-			$('#topicLinefeed').on('change', function () {
+			$('#topicLinefeed').on('change', function() {
 				miscSetting.topicLinefeed = !miscSetting.topicLinefeed;
 				setMiscSetting(miscSetting);
 			});
-			$('#topicRestore').on('change', function () {
+			$('#topicRestore').on('change', function() {
 				miscSetting.topicRestore = !miscSetting.topicRestore;
 				setMiscSetting(miscSetting);
 			});
-			$('#niconamaLinkChange').on('change', function () {
+			$('#niconamaLinkChange').on('change', function() {
 				miscSetting.niconamaLinkChange = !miscSetting.niconamaLinkChange;
 				setMiscSetting(miscSetting);
 			});
 
 			/////////////////////////////
-			// モーダルウィンドウ処理
+			// モーダルウィンドウの処理
 			/////////////////////////////
 
 			// 「.modal-overlay」あるいは「.modal-close」をクリック
-			$('.modal-overlay, #modal-close').off().on('click', function () {
+			$('.modal-overlay, #modal-close').off().on('click', function() {
 				// モーダルコンテンツとオーバーレイをフェードアウト
 				modal.fadeOut('slow');
-				modalOverlay.fadeOut('slow', function () {
+				modalOverlay.fadeOut('slow', function() {
 					// オーバーレイを削除
 					modalOverlay.remove();
 				});
 			});
 
-			// リサイズしたら表示位置を再取得
-			$(window).on('resize', function () {
+			// リサイズしたら表示位置を再設定
+			$(window).on('resize', function() {
 				modalResize();
 			});
 
@@ -878,7 +942,7 @@
 			let dur = $(row).find('span.duration').prop('outerHTML');
 			let date = $(row).find('span.date').prop('outerHTML');
 			// 配信サイトの画像を変更
-			$(row).find('td.status a > img').attr('src', function () {
+			$(row).find('td.status a > img').attr('src', function() {
 				return $(this).attr('src').replace(/_s/g, '');
 			});
 			// 視聴者数
@@ -1066,14 +1130,14 @@
 		// お気に入り
 		let favoriteOffline = getOuterHTML($('#firstList tr.favorite'));
 		let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
-		favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+		favoriteOnline = $(favoriteOnline).sort(function(a, b) {
 			return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
 		});
 		let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
 
 		// オンライン
 		let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
-		online = $(online).sort(function (a, b) {
+		online = $(online).sort(function(a, b) {
 			return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
 		});
 		online = getOuterHTML($(online));
@@ -1086,7 +1150,7 @@
 
 		// 2次
 		let second = getOuterHTML($('#secondList tr.online'));
-		second = $(second).sort(function (a, b) {
+		second = $(second).sort(function(a, b) {
 			return $(a).find('td.name > a[href]').text() < $(b).find('td.name > a[href]').text() ? -1 : 1;
 		});
 		second = getOuterHTML($(second));
@@ -1107,14 +1171,14 @@
 		// お気に入り
 		let favoriteOffline = getOuterHTML($('#firstList tr.favorite.offline'));
 		let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
-		favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+		favoriteOnline = $(favoriteOnline).sort(function(a, b) {
 			return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
 		});
 		let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
 
 		//オンライン
 		let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
-		online = $(online).sort(function (a, b) {
+		online = $(online).sort(function(a, b) {
 			return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
 		});
 		online = getOuterHTML($(online));
@@ -1127,7 +1191,7 @@
 
 		// 2次
 		let second = getOuterHTML($('#secondList tr.online'));
-		second = $(second).sort(function (a, b) {
+		second = $(second).sort(function(a, b) {
 			return getTimeAfterStarting($(a).find('span.date').text()) > getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
 		});
 		second = getOuterHTML($(second));
@@ -1148,14 +1212,14 @@
 		// お気に入り
 		let favoriteOffline = getOuterHTML($('#firstList tr.favorite.offline'));
 		let favoriteOnline = getOuterHTML($('#firstList tr.favorite.online'));
-		favoriteOnline = $(favoriteOnline).sort(function (a, b) {
+		favoriteOnline = $(favoriteOnline).sort(function(a, b) {
 			return getTimeAfterStarting($(a).find('span.date').text()) < getTimeAfterStarting($(b).find('span.date').text()) ? -1 : 1;
 		});
 		let favorite = getOuterHTML($(favoriteOnline)) + favoriteOffline;
 
 		//オンライン
 		let online = getOuterHTML($('#firstList tr.online').not('.favorite'));
-		online = $(online).sort(function (a, b) {
+		online = $(online).sort(function(a, b) {
 			return Number($(a).find('td.log > a').attr('href').slice(14)) < Number($(b).find('td.log > a').attr('href').slice(14)) ? -1 : 1;
 		});
 		online = getOuterHTML($(online));
@@ -1168,7 +1232,7 @@
 
 		// 2次
 		let second = getOuterHTML($('#secondList tr.online'));
-		second = $(second).sort(function (a, b) {
+		second = $(second).sort(function(a, b) {
 			return Number($(a).find('td.log > a').attr('href').slice(14)) < Number($(b).find('td.log > a').attr('href').slice(14)) ? -1 : 1;
 		});
 		second = getOuterHTML($(second));
@@ -1187,7 +1251,7 @@
 	function getOuterHTML(obj) {
 		let outerHTML = '';
 
-		obj.each(function () {
+		obj.each(function() {
 			outerHTML += $(this).prop('outerHTML');
 		});
 
@@ -1341,12 +1405,10 @@
 				$('img.thumbnailSampleImage').attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px : ' + ts.height + 'px');
 				$('#sampleImageHeight').show();
 			}
-			$('div.thumbnailSampleImage').css(
-				{
-					'width': ts.width,
-					'height': ts.width * 0.5625 + 30 + 'px',
-				}
-			);
+			$('div.thumbnailSampleImage').css({
+				'width': ts.width,
+				'height': ts.width * 0.5625 + 30 + 'px',
+			});
 
 			// サンプル画像を設定
 			$('img.thumbnailSampleImage').attr('src', $('img[onmouseover]').first().attr('onmouseover').split('\'')[1]);
@@ -1367,17 +1429,17 @@
 				break;
 			case THUMBNAIL_MODES.MOUSE_OVER:
 				// マウスオーバー
-				$('.popup').each(function () {
+				$('.popup').each(function() {
 					let a = $(this).find('a');
 					// 通常画像
 					$(a).find('img').not('[alt="beam"]').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\';this.className=\'thumbnail\';').attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\';this.className=\'\';');
 					// videoタグ
 					$(a).find('video').hide().parent('a').hover(
-						function () {
+						function() {
 							$(this).find('video').show();
 							$(this).find('img').hide();
 						},
-						function () {
+						function() {
 							$(this).find('video').hide();
 							$(this).find('img').show();
 						}
@@ -1440,13 +1502,4 @@
 	function setMiscSetting(setting) {
 		GM_setValue(DB_NAMES.MISC_SETTING, setting);
 	}
-
-	/////////////////////////////
-	// デバッグ
-	/////////////////////////////
-
-	// デバッグボタン
-	// $('.debug_button').on('click', function () {
-	//     alert(getDisableList());
-	// });
 })();
