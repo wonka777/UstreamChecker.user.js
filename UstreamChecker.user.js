@@ -9,7 +9,7 @@
 // @grant       GM_setValue
 // @grant       GM_addStyle
 // @run-at      document-idle
-// @version     0.1.8.1
+// @version     0.1.8.2
 // ==/UserScript==
 
 /////////////////////////////
