@@ -227,7 +227,7 @@
 			'</div>';
 		// その他の機能
 		Object.keys(modalContents.rightPane.misc).forEach(function(key) {
-			console.log();
+			console.log(key);
 		}, modalContents.rightPane.misc);
 		mwContent +=
 			'<div class="modal-item" id="modal-misc">' +
