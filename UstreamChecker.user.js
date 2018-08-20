@@ -2,14 +2,16 @@
 // @name        UstreamChecker.user.js
 // @namespace   a
 // @description UstreamChecker.user.js
+// @require     https://cdn.rawgit.com/greasemonkey/gm4-polyfill/d58c4f6fbe5702dbf849a04d12bca2f5d635862d/gm4-polyfill.js
 // @require     https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js
 // @include     http://revinx.net/ustream/
 // @include     https://revinx.net/ustream/
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @run-at      document-idle
-// @version     0.1.8.2
+// @grant       GM.getValue
+// @grant       GM.setValue
+// @version     0.2.0
 // ==/UserScript==
 
 /////////////////////////////
@@ -19,9 +21,13 @@
 // 1次2次結合
 // 1次配信を2次へ移動
 // トピックの文章が同じ場合省略
-// リンクをチェッカーページに固定
 // 特定の配信サイトを非表示
 // トピック内のキーワードで非表示
+// プログレスバー モーダルウィンドウボタン変更
+// トピックが空の配信を非表示
+// 設定を一つにまとめる
+// ボタンサイズの設定
+// 登録者の整合性チェック
 
 (function() {
 	'use strict';
@@ -30,252 +36,425 @@
 	// 定数
 	/////////////////////////////
 
-	/**
-	 * データベース用の名前
-	 */
-	const DB_NAMES = {
-		DISABLE_LIST: 'disable_list',
-		DISABLE_SECTION: 'disable_section',
-		FAVORITE_LIST: 'favorite_list',
-		TABLE_ORDER: 'table_order',
-		THUMBNAIL_SETTING: 'thumbnail_setting',
-		FIRST_LIST: '1st_list_section',
-		SECOND_LIST: '2nd_list_section',
-		OTHER: 'other_section',
-		EVENT_TICKER: 'event_ticker',
-		MISC_SETTING: 'misc_setting',
-	};
-
-	/**
-	 * 色
-	 */
-	const COLORS = {
-		UNFAVORITE_MARK: 'rgb(128, 128, 128)',
-		FAVORITE_MARK: 'rgb(255, 140, 0)',
-		FAVORITE_ROW: 'rgb(255, 246, 202)',
-		UNDISABLE_MARK: 'rgb(128, 128, 128)',
-		DISABLE_MARK: 'rgb(255, 0, 0)',
-	};
-
-	/**
-	 * サムネイル表示モード
-	 */
-	const THUMBNAIL_MODES = {
-		DEFAULT: 'default',
-		MOUSE_OVER: 'mouse_over',
-		ALLWAYS: 'allways',
-	};
-
-	/**
-	 * テーブル並び替え用の名前
-	 */
-	const TABLE_ORDERS = {
-		DEFAULT: 'default',
-		ALPHABETICAL: 'alphabetical',
-		START_TIME: 'startTime',
-		ID: 'id',
-	};
-
-	/////////////////////////////
-	// 変数
-	/////////////////////////////
-
-	let disableList;
-	let disableSection;
-	let FavoriteList;
-	let TableOrder;
-	let thumbnailSetting;
-	let miscSetting;
-
-	/////////////////////////////
-	// ページ読み込み後
-	/////////////////////////////
-
-	$(window).load(function() {
-		/////////////////////////////
-		// ボタンの処理
-		/////////////////////////////
-
-		// お気に入りボタン
-		let buttonContent = '<a class="favoriteMark" title="お気に入り">★</a>';
-		// 非表示ボタン
-		buttonContent += '<a class="disableButton" title="非表示">×</a>';
-		// ボタンを挿入
-		$('td.name > a').after(buttonContent);
-
-		// その他の情報開閉トグルボタン
-		$('.noblk').last().before('<br><input type="button" id="otherToggleButton" value="その他の情報を格納">');
-		// その他の情報をまとめる
-		$('#otherToggleButton').nextAll().wrapAll('<div id="otherToggle" />');
-
-		// ボタン用CSS
-		let addCSS = '.favoriteMark, .disableButton, .favoritedMark {cursor: pointer; margin: 2px; font-weight: bold;}' +
-			' .favoriteMark {color:' + COLORS.UNFAVORITE_MARK + '}' +
-			' .disableButton {color: ' + COLORS.UNDISABLE_MARK + '}' +
-			' .favoritedMark {color:' + COLORS.FAVORITE_MARK + ';}' +
-			' .favoriteMark:hover, .disableButton:hover, .favoritedMark:hover {font-size: 30px;}' +
-			' .favoriteMark:hover {color:' + COLORS.FAVORITE_MARK + ' !important;}' +
-			' .disableButton:hover {color:' + COLORS.DISABLE_MARK + ' !important;}' +
-			' .favoritedMark:hover {color:' + COLORS.UNFAVORITE_MARK + ' !important;}';
-
-		// ボタン装飾用CSS
-		addCSS +=
-			'.button {width: 100px; margin: 2px 2px 2px auto; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
-			'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
-			'.button:active {top: 3px; box-shadow: none;}';
-
-		/////////////////////////////
-		// テーブル用CSS
-		/////////////////////////////
-
-		addCSS += 'tr.favorite > td {background-color: ' + COLORS.FAVORITE_ROW + ' !important;}';
-
-		/////////////////////////////
+	const UUJ = {
+		// データベース用の名前
+		DB_NAMES: {
+			DISABLE_LIST: 'disable_list',
+			DISABLE_SECTION: 'disable_section',
+			FAVORITE_LIST: 'favorite_list',
+			TABLE_ORDER: 'table_order',
+			THUMBNAIL_SETTING: 'thumbnail_setting',
+			FIRST_LIST: '1st_list_section',
+			SECOND_LIST: '2nd_list_section',
+			OTHER: 'other_section',
+			EVENT_TICKER: 'event_ticker',
+			MISC_SETTING: 'misc_setting',
+		},
+		// 色
+		COLORS: {
+			UNFAVORITE_MARK: 'rgb(128, 128, 128)',
+			FAVORITE_MARK: 'rgb(255, 140, 0)',
+			FAVORITE_ROW: 'rgb(255, 246, 202)',
+			UNDISABLE_MARK: 'rgb(128, 128, 128)',
+			DISABLE_MARK: 'rgb(255, 0, 0)',
+		},
+		// 追加するパーツ
+		ADD_PARTS: {
+			ModalOpenButton: {
+				id: 'modal-open',
+				value: '拡張スクリプト設定',
+			},
+			ModalCloseButton: {
+				type: 'button',
+				class: 'button',
+				id: 'modal-close',
+				value: '閉じる',
+			},
+			ModalOverlay: {
+				class: 'modal-overlay',
+			},
+			FavoriteMark: {
+				type: 'link',
+				class: 'favoriteMark',
+				label: 'お気に入り',
+				value: '★',
+			},
+			FavoritedMark: {
+				type: 'link',
+				class: 'favoritedMark',
+				label: 'お気に入り',
+				value: '★',
+			},
+			DisableButton: {
+				type: 'link',
+				class: 'disableButton',
+				label: '非表示',
+				value: '×',
+			},
+			OtherToggleButton: {
+				type: 'link',
+				id: 'otherToggleButton',
+				openLabel: 'その他の情報を展開',
+				closeLabel: 'その他の情報を格納',
+			},
+		},
 		// モーダルウィンドウ
-		/////////////////////////////
-
-		// モーダルウィンドウボタンを挿入
-		$('#topMenuBar > ul').append('<li><a data-target="wm" class="modal-open" style="cursor: pointer;">拡張スクリプト設定</a></li>');
-		// モーダルウィンドウ本体を挿入
-		$('body').append('<div id="mw" class="modal-content"></div>');
-		let mw = $('div.modal-content');
-
-		// タイトル
-		let mwContent = '<h2>拡張スクリプト設定 &lt; ' + GM_info.script.name + ' version ' + GM_info.script.version + ' &gt;</h2>';
-		// 左メニュー
-		mwContent +=
-			'<div class="modal-left">' +
-			'	<ul>' +
-			'		<li id="menu-all">すべて</li>' +
-			'		<li id="menu-favorite">お気に入り</li>' +
-			'		<li id="menu-disable">非表示</li>' +
-			'		<li id="menu-sort">ソート</li>' +
-			'		<li id="menu-thumbnail">サムネイル</li>' +
-			'		<li id="menu-misc">その他の設定</li>' +
-			'	</ul>' +
-			'</div>';
-		// 右ペイン
-		mwContent += '<div class="modal-right">';
-		// お気に入りリスト
-		mwContent +=
-			'<div class="modal-item" id="modal-favorite">' +
-			'	<h3>お気に入りリスト</h3>' +
-			'	<textarea value="" id="favoriteListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" />' +
-			'	<input type="button" class="button" id="favoriteListSaveButton" value="保存">' +
-			'	<input type="button" class="button" id="favoriteListInitializeButton" value="初期化">' +
-			'</div>';
-		// 非表示リスト
-		mwContent +=
-			'<div class="modal-item" id="modal-disableList">' +
-			'	<h3>非表示リスト</h3>' +
-			'	<textarea value="" id="disableListText" rows="5" wrap="hard" style="width:100%; max-width:100%; min-width:100%;" />' +
-			'	<input type="button" class="button" id="disableListSaveButton" value="保存">' +
-			'	<input type="button" class="button" id="disableListInitializeButton" value="初期化">' +
-			'</div>';
-		// 非表示セクション
-		mwContent +=
-			'<div class="modal-item" id="modal-disableSection">' +
-			'	<h3>部分非表示(チェックすると非表示)</h3>' +
-			'	<div class="modal-item">' +
-			'		<input type="checkbox" class="disableSectionCheckbox" id="1st_list_section"><label for="1st_list_section">1次チェッカー</label>' +
-			'		<input type="checkbox" class="disableSectionCheckbox" id="2nd_list_section"><label for="2nd_list_section">2次チェッカー</label>' +
-			'		<input type="checkbox" class="disableSectionCheckbox" id="other_section"><label for="other_section">その他の情報</label>' +
-			'	</div>' +
-			'	<div class="modal-item">' +
-			'		<input type="checkbox" class="disableSectionCheckbox" id="event_ticker"><label for="event_ticker">イベントティッカー</label>' +
-			'	</div>' +
-			'	<input type="button" class="button" id="disableSectionInitializeButton" value="初期化">' +
-			'</div>';
-		// ソート順
-		mwContent +=
-			'<div class="modal-item" id="modal-sort">' +
-			'	<h3>ソート順</h3>' +
-			'	<input type="radio" class="orderRadio" id="defaultOrderRadio" name="orderRadio"><label for="defaultOrderRadio">デフォルト(視聴者人数順)</label>' +
-			'	<input type="radio" class="orderRadio" id="alphabeticalOrderRadio" name="orderRadio"><label for="alphabeticalOrderRadio">配信者名のあいうえお順</label>' +
-			'	<input type="radio" class="orderRadio" id="startTimeOrderRadio" name="orderRadio"><label for="startTimeOrderRadio">配信開始時間順</label>' +
-			'	<input type="radio" class="orderRadio" id="idOrderRadio" name="orderRadio"><label for="idOrderRadio">登録番号順</label>' +
-			'</div>';
-		// サムネイル設定
-		mwContent +=
-			'<div class="modal-item" id="modal-thumbnail">' +
-			'	<h3>サムネイル表示</h3>' +
-			'	<div class="modal-item thumbnailMode">' +
-			'		<input type="radio" class="thumbnailCustomRadio" id="thumbnailDefault" name="thumbnailRadio"><label for="thumbnailDefault">デフォルト</label>' +
-			'		<input type="radio" class="thumbnailCustomRadio" id="thumbnailMouseOver" name="thumbnailRadio"><label for="thumbnailMouseOver">マウスオーバー</label>' +
-			'		<s><input type="radio" class="thumbnailCustomRadio" id="thumbnailAlways" name="thumbnailRadio"><label for="thumbnailAlways">常にサムネイルで表示する</label></s>' +
-			'	</div>' +
-			'	<div class="modal-item thumbnailSize">' +
-			'		<h4>画像の大きさ</h4>' +
-			'		<div class="thumbnailSample-item">' +
-			'			<p id="sampleImageKeepAspect">' +
-			'				<input type="checkbox" class="thumbnailRatioCheckbox" id="thumbnailAutoRatio"><label for="thumbnailAutoRatio">画像のアスペクト比を変更しない</label>' +
-			'			</p>' +
-			'			<p id="sampleImageWidth">' +
-			'				横<input type="number" id="thumbnailWidth" value="50" min="50">px' +
-			'			</p>' +
-			'			<p id="sampleImageHeight">' +
-			'				縦<input type="number" id="thumbnailHeight" value="50" min="50">px' +
-			'			</p>' +
-			'		</div>' +
-			'		<div class="thumbnailSample-item">' +
-			'			<div class="thumbnailSampleImage">' +
-			'				<img class="thumbnailSampleImage" alt="thumbnail" width="50px" height="50px" src="./img/ust_s.png">' +
-			'				<figcaption>50px : 50px</figcaption>' +
-			'			</div>' +
-			'		</div>' +
-			'	</div>' +
-			'</div>';
-		// その他の機能
-		Object.keys(modalContents.rightPane.misc).forEach(function(key) {
-			console.log(key);
-		}, modalContents.rightPane.misc);
-		mwContent +=
-			'<div class="modal-item" id="modal-misc">' +
-			'	<h3>その他の機能</h3>' +
-			'	<div class="modal-item">' +
-			'		<h3>トピック</h3>' +
-			'		<input type="checkbox" class="miscCheckbox" id="topicLinefeed"><label for="topicLinefeed">トピックを一つずつ改行して表示する</label><br>' +
-			'		<input type="checkbox" class="miscCheckbox" id="topicRestore"><label for="topicRestore">省略されているトピックを復元</label>' +
-			'	</div>' +
-			'	<div class="modal-item">' +
-			'		<h3>リンク変更</h3>' +
-			'		<input type="checkbox" class="miscCheckbox" id="niconamaLinkChange"><label for="niconamaLinkChange">ニコ生のURLをlv123456789からco123456789に変更</label>' +
-			'	</div>' +
-			'</div>';
-		mwContent += '</div>';
-		// 閉じるボタン
-		mwContent += '<input type="button" class="button" id="modal-close" value="閉じる">';
-
-		let modalContents = {
+		MODAL_WINDOW: {
+			class: 'modal-content',
 			leftMenu: {
 				class: 'modal-left',
 				menuAll: {
 					id: 'menu-all',
+					class: 'leftMenu',
 					value: 'すべて',
+					getSelecters: function() {
+						let sel = [];
+
+						Object.keys(UUJ.MODAL_WINDOW.rightPane).forEach(function(key) {
+							if (typeof this[key] === 'object') {
+								sel.push(this[key].getSelecter('id'));
+							}
+						}, UUJ.MODAL_WINDOW.rightPane);
+
+						return sel.join(', ');
+					},
 				},
 				menuFavorite: {
-					id: 'menu-favorite',
+					id: 'menuFavorite',
+					class: 'leftMenu',
 					value: 'お気に入り',
+					getSelecters: function() {
+						return UUJ.MODAL_WINDOW.rightPane.favoriteList.getSelecter('id');
+					},
 				},
 				menuDisable: {
-					id: 'menu-disable',
+					id: 'menuDisable',
+					class: 'leftMenu',
 					value: '非表示',
+					getSelecters: function() {
+						return UUJ.MODAL_WINDOW.rightPane.disableList.getSelecter('id') + ', ' + UUJ.MODAL_WINDOW.rightPane.disableSection.getSelecter('id');
+					},
 				},
-				menuSort: {
-					id: 'menu-sort',
+				menuTableOrder: {
+					id: 'menuTableOrder',
+					class: 'leftMenu',
 					value: 'ソート',
+					getSelecters: function() {
+						return UUJ.MODAL_WINDOW.rightPane.tableOrder.getSelecter('id');
+					},
 				},
 				menuThumbnail: {
-					id: 'menu-thumbnail',
+					id: 'menuThumbnail',
+					class: 'leftMenu',
 					value: 'サムネイル',
+					getSelecters: function() {
+						return UUJ.MODAL_WINDOW.rightPane.thumbnail.getSelecter('id');
+					},
 				},
 				menuMisc: {
-					id: 'menu-misc',
+					id: 'menuMisc',
+					class: 'leftMenu',
 					value: 'その他の設定',
+					getSelecters: function() {
+						return UUJ.MODAL_WINDOW.rightPane.misc.getSelecter('id');
+					},
 				},
 			},
 			rightPane: {
 				class: 'modal-right',
+				favoriteList: {
+					class: 'modal-item',
+					id: 'modal-favorite',
+					title: {
+						type: 'title',
+						value: 'お気に入りリスト',
+					},
+					info: {
+						type: 'info',
+						class: 'modal-info',
+						value: '1次配信者は常に、2次配信者は配信中のみお気に入り表示される',
+					},
+					textarea: {
+						type: 'textarea',
+						id: 'favoriteListText',
+					},
+					saveButton: {
+						type: 'button',
+						class: 'button',
+						id: 'favoriteListSaveButton',
+						value: '保存',
+					},
+					initializeButton: {
+						type: 'button',
+						class: 'button',
+						id: 'favoriteListInitializeButton',
+						value: '初期化',
+					},
+				},
+				disableList: {
+					class: 'modal-item',
+					id: 'modal-disableList',
+					title: {
+						type: 'title',
+						value: '非表示リスト',
+					},
+					textarea: {
+						type: 'textarea',
+						id: 'disableListText',
+					},
+					saveButton: {
+						type: 'button',
+						class: 'button',
+						id: 'disableListSaveButton',
+						value: '保存',
+					},
+					initializeButton: {
+						type: 'button',
+						class: 'button',
+						id: 'disableListInitializeButton',
+						value: '初期化',
+					},
+				},
+				disableSection: {
+					class: 'modal-item',
+					id: 'modal-disableSection',
+					title: {
+						type: 'title',
+						value: '部分非表示',
+					},
+					info: {
+						type: 'info',
+						class: 'modal-info',
+						value: 'チェックすると非表示',
+					},
+					sections: {
+						class: 'modal-item',
+						firstList: {
+							type: 'checkbox',
+							class: 'disableSectionCheckbox',
+							id: '1st_list_section',
+							label: '1次チェッカー',
+							selecter: '.noblk:first',
+							linefeed: false,
+						},
+						secondList: {
+							type: 'checkbox',
+							class: 'disableSectionCheckbox',
+							id: '2nd_list_section',
+							label: '2次チェッカー',
+							selecter: '.noblk:eq(1)',
+							linefeed: false,
+						},
+						other: {
+							type: 'checkbox',
+							class: 'disableSectionCheckbox',
+							id: 'other_section',
+							label: 'その他の情報',
+							selecter: '#otherToggle',
+							linefeed: false,
+						},
+					},
+					other: {
+						class: 'modal-item',
+						eventTicker: {
+							type: 'checkbox',
+							class: 'disableSectionCheckbox',
+							id: 'event_ticker',
+							label: 'イベントティッカー',
+							selecter: '.ticker',
+							linefeed: false,
+						},
+					},
+				},
+				tableOrder: {
+					class: 'modal-item',
+					id: 'modal-sort',
+					title: {
+						type: 'title',
+						value: 'ソート順',
+					},
+					default: {
+						type: 'radio',
+						class: 'orderRadio',
+						id: 'defaultOrderRadio',
+						name: 'orderRadio',
+						label: 'デフォルト(視聴者人数順)',
+						tableOrder: 'default',
+						linefeed: false,
+						execute: function() {
+							// default
+						},
+					},
+					alphabetical: {
+						type: 'radio',
+						class: 'orderRadio',
+						id: 'alphabeticalOrderRadio',
+						name: 'orderRadio',
+						label: '配信者名のあいうえお順',
+						tableOrder: 'alphabetical',
+						linefeed: false,
+						execute: function() {
+							reorderAlphabetical();
+						},
+					},
+					startTime: {
+						type: 'radio',
+						class: 'orderRadio',
+						id: 'startTimeOrderRadio',
+						name: 'orderRadio',
+						label: '配信開始時間順',
+						tableOrder: 'startTime',
+						linefeed: false,
+						execute: function() {
+							reorderStartTime();
+						},
+					},
+					checkerId: {
+						type: 'radio',
+						class: 'orderRadio',
+						id: 'idOrderRadio',
+						name: 'orderRadio',
+						label: '登録番号順',
+						tableOrder: 'id',
+						linefeed: false,
+						execute: function() {
+							reorderId();
+						},
+					},
+				},
+				thumbnail: {
+					class: 'modal-item',
+					id: 'modal-thumbnail',
+					title: {
+						type: 'title',
+						value: 'サムネイル表示',
+					},
+					mode: {
+						class: 'thumbnailMode',
+						default: {
+							type: 'radio',
+							class: 'thumbnailCustomRadio',
+							id: 'thumbnailDefault',
+							name: 'thumbnailCustomRadio',
+							label: 'デフォルト',
+							mode: 'default',
+							linefeed: false,
+							execute: function() {},
+						},
+						mouseOver: {
+							type: 'radio',
+							class: 'thumbnailCustomRadio',
+							id: 'thumbnailMouseOver',
+							name: 'thumbnailCustomRadio',
+							label: 'マウスオーバー',
+							mode: 'mouseOver',
+							linefeed: false,
+							execute: function() {
+								$('.popup').each(function() {
+									// aタグ
+									let a = $(this).find('a');
+
+									let url0 = $(a).find('img').eq(0).attr('src');
+									let url1 = $(a).find('img').eq(1).attr('src');
+
+									// url判定
+									if (url0.match('^http*')) {
+										$(a).find('img').not('[alt="beam"]').eq(1).attr(
+											'onmouseover',
+											'this.src=\'' + url0 + '\';this.className=\'thumbnail\';'
+										).attr(
+											'onmouseout',
+											'this.src=\'' + url1 + '\';this.className=\'\';'
+										);
+									}
+
+									// videoタグ
+									$(a).find('video').hide().parent('a').hover(
+										function() {
+											$(this).find('video').show();
+											$(this).find('img').hide();
+										},
+										function() {
+											$(this).find('video').hide();
+											$(this).find('img').show();
+										}
+									);
+
+									// 適用
+									$(a).find('img.r').remove();
+									$(a).appendTo($(this).parent('td.status'));
+									$(this).remove();
+								});
+							},
+						},
+						// allways: {
+						// 	type: 'radio',
+						// 	class: 'thumbnailCustomRadio',
+						// 	id: 'thumbnailAlways',
+						// 	name: 'thumbnailCustomRadio',
+						// 	label: '常にサムネイルで表示する',
+						// 	mode: 'allways',
+						// 	linefeed: false,
+						// },
+					},
+					size: {
+						class: 'thumbnailSize',
+						title: {
+							type: 'title',
+							value: '画像の大きさ',
+						},
+						setting: {
+							class: 'thumbnailSample-item',
+							keepAspect: {
+								id: 'sampleImageKeepAspect',
+								item: {
+									type: 'checkbox',
+									class: 'thumbnailRatioCheckbox',
+									id: 'thumbnailAutoRatio',
+									label: '画像のアスペクト比を変更しない',
+									linefeed: false,
+								},
+							},
+							width: {
+								id: 'sampleImageWidth',
+								item: {
+									type: 'number',
+									class: 'thumbnailSizeNumber',
+									id: 'thumbnailWidth',
+									beforeLabel: '横',
+									afterLabel: 'px',
+									linefeed: false,
+								},
+							},
+							height: {
+								id: 'sampleImageHeight',
+								item: {
+									type: 'number',
+									class: 'thumbnailSizeNumber',
+									id: 'thumbnailHeight',
+									beforeLabel: '縦',
+									afterLabel: 'px',
+									linefeed: false,
+								},
+							},
+						},
+						sampleImage: {
+							class: 'thumbnailSample-item',
+							item: {
+								class: 'thumbnailSampleImage',
+								image: {
+									type: 'image',
+									class: 'thumbnailSampleImage',
+									alt: 'thumbnail',
+								},
+								figcaption: {
+									type: 'figcaption',
+									value: '150px : 150px',
+								},
+							},
+						},
+					},
+				},
 				misc: {
 					class: 'modal-item',
 					id: 'modal-misc',
@@ -284,6 +463,7 @@
 						value: 'その他の機能',
 					},
 					topic: {
+						class: 'modal-item',
 						title: {
 							type: 'title',
 							value: 'トピック',
@@ -293,221 +473,426 @@
 							class: 'miscCheckbox',
 							id: 'topicLinefeed',
 							label: 'トピックを一つずつ改行して表示する',
+							linefeed: true,
+							execute: function() {
+								$('td.topic > img+img').before(function() {
+									// 改行を追加
+									$(this).before('<br>');
+								});
+							},
 						},
 						topicRestore: {
 							type: 'checkbox',
 							class: 'miscCheckbox',
 							id: 'topicRestore',
 							label: '省略されているトピックを復元',
+							linefeed: false,
+							execute: function() {
+								$('p.arrow_box').each(function() {
+									// 省略されていないトピックを取得
+									let topic = $(this).html().replace(/^<br>/g, '').replace(/<br>$/g, '');
+									// 反映
+									$(this).parent().html(topic);
+								});
+							},
 						},
 					},
 					link: {
+						class: 'modal-item',
+						title: {
+							type: 'title',
+							value: 'リンク変更',
+						},
+						fixCheckerLink: {
+							type: 'checkbox',
+							class: 'miscCheckbox',
+							id: 'fixCheckerLink',
+							label: '配信ページのURLをチェッカーページに固定する',
+							linefeed: true,
+							execute: function() {
+								$('td.name a[href]').not('a[href^="./page"]').each(function() {
+									// ログ欄のURLからidを取得
+									let id = $(this).parent().parent().find('td.log > a').attr('href').match(/(\d*)$/g)[0];
+									$(this).attr('href', './page/' + id);
+								});
+							},
+						},
 						niconamaLinkChange: {
 							type: 'checkbox',
 							class: 'miscCheckbox',
 							id: 'niconamaLinkChange',
 							label: 'ニコ生のURLを個別番号(lv123456789)からコミュニティ番号(co123456789)に変更',
+							linefeed: false,
+							execute: function() {
+								$('td.status img[alt="nico"]').each(function() {
+									// ニコ生のURL
+									let url = $(this).parent('a').attr('href').substring(0, 32);
+									// 登録コミュニティからコミュニティ番号を取得
+									let number = $(this).closest('.status').nextAll('.archives').find('img[alt="nico"]').last().parent().attr('href').match(/(co\d+)/g);
+									if (number) {
+										// co
+										number = number[0];
+									} else {
+										// ch
+										number = $(this).closest('.status').nextAll('.archives').find('img[alt="nico"]').last().parent().attr('href').match(/(ch\d+)/g);
+										if (number) {
+											number = number[0];
+										} else {
+											return;
+										}
+									}
+
+									$(this).parent('a').attr('href', url + number);
+								});
+							},
 						},
+					},
+					getItemClass: function() {
+						let c;
+						Object.keys(UUJ.MODAL_WINDOW.rightPane.misc).find(function(key) {
+							if (typeof this[key] === 'object' && this[key].type !== 'title') {
+								Object.keys(this[key]).find(function(key) {
+									if (typeof this[key] === 'object' && this[key].type !== 'title') {
+										c = this[key].class;
+									}
+								}, this[key]);
+							}
+						}, UUJ.MODAL_WINDOW.rightPane.misc);
+
+						return '.' + c;
 					},
 				},
 			},
-		};
+		},
+	};
 
+	/////////////////////////////
+	// 変数
+	/////////////////////////////
+
+	let DisableList;
+	let DisableSection;
+	let FavoriteList;
+	let TableOrder;
+	let ThumbnailSetting;
+	let MiscSetting;
+
+	/**
+	 * loadConfig
+	 */
+	async function loadConfig() {
+		DisableList = await GM.getValue(UUJ.DB_NAMES.DISABLE_LIST);
+		DisableSection = await GM.getValue(UUJ.DB_NAMES.DISABLE_SECTION);
+		FavoriteList = await GM.getValue(UUJ.DB_NAMES.FAVORITE_LIST);
+		TableOrder = await GM.getValue(UUJ.DB_NAMES.TABLE_ORDER);
+		ThumbnailSetting = await GM.getValue(UUJ.DB_NAMES.THUMBNAIL_SETTING);
+		MiscSetting = await GM.getValue(UUJ.DB_NAMES.MISC_SETTING);
+	}
+
+	/////////////////////////////
+	// ページ読み込み後
+	/////////////////////////////
+
+	$(window).load(function() {
+		/////////////////////////////
+		// prototype拡張
+		/////////////////////////////
+
+		// セレクタを取得する関数を追加
+		window.Object.defineProperty(Object.prototype, 'getSelecter', {
+			value: function(o = 'exist') {
+				if (o === 'exist') {
+					if (this.class !== undefined) {
+						return '.' + this.class;
+					} else if (this.id !== undefined) {
+						return '#' + this.id;
+					} else {
+						return undefined;
+					}
+				} else if (o === 'class' && this.class !== undefined) {
+					return '.' + this.class;
+				} else if (o === 'id' && this.id !== undefined) {
+					return '#' + this.id;
+				} else {
+					return undefined;
+				}
+			},
+		});
+
+		debug();
+
+		/////////////////////////////
+		// 追加するボタンの処理
+		/////////////////////////////
+
+		// お気に入りボタン
+		let buttonContent = generateTagFromObject(UUJ.ADD_PARTS.FavoriteMark);
+		// 非表示ボタン
+		buttonContent += generateTagFromObject(UUJ.ADD_PARTS.DisableButton);
+		// ボタンを挿入
+		$('td.name > a').after(buttonContent);
+
+		// その他の情報開閉トグルボタンを挿入
+		$('#loadBack2').parent().after('<br><input type="button" id="' + UUJ.ADD_PARTS.OtherToggleButton.id + '" value="' + UUJ.ADD_PARTS.OtherToggleButton.closeLabel + '">');
+		// その他の情報をまとめる
+		$(UUJ.ADD_PARTS.OtherToggleButton.getSelecter()).nextAll().wrapAll('<div id="otherToggle" />');
+
+		// ボタン用CSS
+		let addCSS =
+			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ', ' + UUJ.ADD_PARTS.DisableButton.getSelecter() + ', ' + UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ' {cursor: pointer; margin: 2px; font-weight: bold;} ' +
+			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ' {color:' + UUJ.COLORS.UNFAVORITE_MARK + ';} ' +
+			UUJ.ADD_PARTS.DisableButton.getSelecter() + ' {color: ' + UUJ.COLORS.UNDISABLE_MARK + ';} ' +
+			UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ' {color: ' + UUJ.COLORS.FAVORITE_MARK + ';} ' +
+			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ':hover, ' + UUJ.ADD_PARTS.DisableButton.getSelecter() + ':hover, ' + UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ':hover {font-size: 30px;} ' +
+			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ':hover {color:' + UUJ.COLORS.FAVORITE_MARK + ' !important;} ' +
+			UUJ.ADD_PARTS.DisableButton.getSelecter() + ':hover {color:' + UUJ.COLORS.DISABLE_MARK + ' !important;} ' +
+			UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ':hover {color:' + UUJ.COLORS.UNFAVORITE_MARK + ' !important;}';
+
+		// ボタン装飾用CSS
+		addCSS +=
+			'.button {cursor: pointer; width: 100px; margin: 2px 2px 2px auto; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
+			'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
+			'.button:active {top: 3px; box-shadow: none;}';
+
+		/////////////////////////////
+		// テーブル用CSS
+		/////////////////////////////
+
+		addCSS += 'tr.favorite > td {background-color: ' + UUJ.COLORS.FAVORITE_ROW + ' !important;}';
+
+		/////////////////////////////
+		// モーダルウィンドウ
+		/////////////////////////////
+
+		// モーダルウィンドウボタンを挿入
+		$('#topMenuBar > ul').append('<li><a data-target="wm" id="' + UUJ.ADD_PARTS.ModalOpenButton.id + '" style="cursor: pointer;">' + UUJ.ADD_PARTS.ModalOpenButton.value + '</a></li>');
+		// モーダルウィンドウ本体を挿入
+		$('body').append('<div id="mw" class="' + UUJ.MODAL_WINDOW.class + '"></div>');
+
+		// タイトル
+		let mwContent = '<h2>拡張スクリプト設定 &lt; ' + GM.info.script.name + ' version ' + GM.info.script.version + ' &gt;</h2>';
+
+		// 左メニュー
+		mwContent += '<div class="' + UUJ.MODAL_WINDOW.leftMenu.class + '"><ul>';
+		Object.keys(UUJ.MODAL_WINDOW.leftMenu).forEach(function(key) {
+			if (typeof this[key] === 'object') {
+				mwContent += '<li class="' + this[key].class + '" id="' + this[key].id + '">' + this[key].value + '</li>';
+			}
+		}, UUJ.MODAL_WINDOW.leftMenu);
+		mwContent += '</ul></div>';
+
+		// 右ペイン
+		mwContent += '<div class="' + UUJ.MODAL_WINDOW.rightPane.class + '">';
+		Object.keys(UUJ.MODAL_WINDOW.rightPane).forEach(function(key) {
+			if (typeof this[key] === 'object') {
+				mwContent += '<div class="' + this[key].class + '" id="' + this[key].id + '">';
+				Object.keys(this[key]).forEach(function(key) {
+					if (typeof this[key] === 'object') {
+						if (this[key].type !== undefined) {
+							mwContent += generateTagFromObject(this[key]);
+						} else {
+							mwContent += '<div class="' + this[key].class + '">';
+							Object.keys(this[key]).forEach(function(key) {
+								if (typeof this[key] === 'object') {
+									if (this[key].type !== undefined) {
+										mwContent += generateTagFromObject(this[key]);
+									} else {
+										mwContent += '<div class="' + this[key].class + '">';
+										Object.keys(this[key]).forEach(function(key) {
+											if (typeof this[key] === 'object') {
+												mwContent += '<div id="' + this[key].id + '">';
+												Object.keys(this[key]).forEach(function(key) {
+													if (typeof this[key] === 'object') {
+														mwContent += generateTagFromObject(this[key]);
+													}
+												}, this[key]);
+												mwContent += '</div>';
+											}
+										}, this[key]);
+										mwContent += '</div>';
+									}
+								}
+							}, this[key]);
+							mwContent += '</div>';
+						}
+					}
+				}, this[key]);
+				mwContent += '</div>';
+			}
+		}, UUJ.MODAL_WINDOW.rightPane);
+		mwContent += '</div>';
+		// 閉じるボタン
+		mwContent += generateTagFromObject(UUJ.ADD_PARTS.ModalCloseButton);
 		// 挿入
-		mw.append(mwContent);
+		$(UUJ.MODAL_WINDOW.getSelecter()).append(mwContent);
 
 		// modal-window用CSS
-		addCSS += '.modal-content {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff;}' +
-			'.modal-left {display: table-cell; width: 190px; border-right: 8px dotted #CCC;}' +
-			'.modal-right {display: table-cell; width: inherit;}' +
-			'.modal-left ul {list-style-type: none; padding: 10px 0px 10px 5px;}' +
-			'.modal-left li {border: 1px solid #9F99A3; border-radius: 6px; background-color: #EEEEEE; padding: 3px 10px; text-decoration: none; color: #333; width: 150px; margin: 2px 0px; text-align: left; font-size: 18px;}' +
-			'.modal-left li:hover {border: 1px solid #8593A9; background-color: #9EB7DD;}' +
+		addCSS += UUJ.MODAL_WINDOW.getSelecter() + ' {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff; border-spacing: 2px 0px;}' +
+			'.modal-item, ' + UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.thumbnail.size.getSelecter() + ' {border: medium solid #CCC; padding: 10px; margin: 10px; border-collapse: separate;}' +
+			// 左メニュー
+			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' {display: table-cell; width: 190px;}' +
+			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' ul {list-style-type: none; padding: 10px 0px 10px 5px;}' +
+			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li {border: 1px solid #9F99A3; background-color: #EEEEEE; padding: 3px 10px; text-decoration: none; color: #333; width: 150px; margin: 2px 0px; text-align: left; font-size: 18px; cursor: pointer;}' +
+			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li:hover {border: 1px solid #8593A9; background-color: #9EB7DD;}' +
 			'.selected-menu {background-color: #FFF6CA !important;}' +
-			'.modal-item {border: medium solid #CCC; padding: 10px; border-radius: 10px; margin: 10px; border-collapse: separate; border-spacing: 10px 0px;}' +
-			'.thumbnailSample-item {display: table-cell; width: 260px; text-align: center; vertical-align: middle; border: medium solid #CCC; padding: 10px; border-radius: 10px;}' +
-			'.thumbnailSample-item > * {margin: 2px;}' +
-			'div.thumbnailSampleImage {background: #CCC;}' +
+			// 右メニュー
+			UUJ.MODAL_WINDOW.rightPane.getSelecter() + ' {display: table-cell; width: inherit;}' +
+			UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.getSelecter() + ' {display: table-cell; width: 260px; text-align: center; vertical-align: middle; border: medium solid #CCC; padding: 10px;}' +
+			UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.getSelecter() + ' > * {margin: 2px;}' +
+			UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.item.getSelecter() + ' {background: #CCC;}' +
 			'input[type=number] {text-align: right;}';
 
 		// modal-overlay用CSS
-		addCSS += '.modal-overlay {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}';
+		addCSS += UUJ.ADD_PARTS.ModalOverlay.getSelecter() + ' {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}';
 
 		// CSSをまとめて設定
-		GM_addStyle(addCSS);
+		addStyle(addCSS);
 
-		/////////////////////////////
-		// 設定の反映
-		/////////////////////////////
+		loadConfig().then().then(() => main());
 
-		// 非表示セクションの反映
-		updateDisableSection();
-
-		// リスト適用
-		$('td.name > a[href]').each(function() {
-			// 非表示リストの反映
-			let name = $(this).text().replace(/\r?\n/g, '');
-			if ($.inArray(name, getDisableList()) != -1) {
-				deleteRow(this);
-			}
-
-			// お気に入りリストの反映
-			if ($.inArray(name, getFavoriteList()) >= 0) {
-				// ★の色変更
-				$(this).next().removeClass('favoriteMark').addClass('favoritedMark');
-				// お気に入りへ移動
-				moveFavoriteRow($(this).parent().parent());
-			}
-		});
-
-		// テーブルソートの反映
-		updateTableOrder(true);
-
-		// サムネイル表示の反映
-		updateThumbnailSetting(true);
-
-		// トピックを改行して表示
-		if (getMiscSetting().topicLinefeed) {
-			$('td.topic > img+img').before(function() {
-				$(this).before('<br>');
-			});
-		}
-
-		// 省略されているトピックを復活
-		if (getMiscSetting().topicRestore) {
-			$('p.arrow_box').each(function() {
-				// 省略されていないトピックを取得
-				let topic = $(this).html().replace(/^<br>/g, '').replace(/<br>$/g, '');
-				// 反映
-				$(this).parent().html(topic);
-			});
-		}
-
-		// ニコ生リンク修正
-		if (getMiscSetting().niconamaLinkChange) {
-			$('td.status img[alt="nico"]').each(function() {
-				let url = $(this).parent('a').attr('href').substring(0, 32) +
-					$(this).closest('.status').nextAll('.archives').find('img[alt="nico"]').parent().attr('href').split('?')[0].substr(38);
-
-				$(this).parent('a').attr('href', url);
-			});
-		}
-
-		// イベントバーを移動
-		$('.ticker').insertBefore('.noblk:first');
-
-		/////////////////////////////
-		// ボタンイベント
-		/////////////////////////////
-
-		// 非表示ボタン
-		$('.disableButton').on('click', function() {
-			if (confirm('[' + nameFromDisableButton($(this)) + ']を非表示にしますか？')) {
-				// OK
-				addDisableList(nameFromDisableButton($(this)));
-				deleteRow(this);
-			} else {
-				// cancel
-				//console.log('canceled add disable list');
-			}
-		});
-
-		// お気に入りボタン
-		$(document).on('click', '.favoriteMark', function() {
-			// リストにない
-			addFavoriteList(nameFromFavoriteButton(this));
-			$(this).removeClass('favoriteMark').addClass('favoritedMark');
-			// お気に入りへ移動
-			moveFavoriteRow($(this).parent().parent());
-		});
-		// お気に入り解除ボタン
-		$(document).on('click', '.favoritedMark', function() {
-			let index = $.inArray(nameFromFavoriteButton(this), getFavoriteList());
-			// リストから削除
-			removeFavoriteList(index);
-			// マーク変更
-			$(this).removeClass('favoritedMark').addClass('favoriteMark');
-			// お気に入り外へ移動
-			removeFavoriteRow($(this).parent().parent());
-		});
-
-		// その他欄の非表示トグルボタン
-		$('#otherToggleButton').on('click', function() {
-			toggleSection(DB_NAMES.OTHER);
-		});
-
-		/////////////////////////////
-		// モーダルウィンドウイベント
-		/////////////////////////////
-
-		// 「.modal-open」をクリック
-		$('.modal-open').on('click', function() {
-			// 重複を防ぐ
-			if ($('div').hasClass('modal-overlay')) {
-				$('.modal-overlay').trigger('click');
-				return;
-			}
-
-			// オーバーレイ用の要素を追加
-			$('body').append('<div class="modal-overlay"></div>');
-			// モーダルコンテンツのIDを取得
-			let modal = $('#mw');
-			let modalOverlay = $('.modal-overlay');
-			// オーバーレイをフェードイン
-			modalOverlay.fadeIn('slow');
-			// モーダルコンテンツの表示位置を設定
-			modalResize();
-			// モーダルコンテンツフェードイン
-			modal.fadeIn('slow');
-
+		/**
+		 *  main
+		 */
+		function main() {
 			/////////////////////////////
-			// モーダルウィンドウに設定内容を表示
+			// 設定の反映
 			/////////////////////////////
 
-			// 左メニューのデフォルト
-			if (!$('li').hasClass('selected-menu')) {
-				$('#menu-all').addClass('selected-menu');
-			}
+			// 非表示セクションの反映
+			updateDisableSection();
 
-			// 非表示リストの中身を表示
-			$('#disableListText').val(getDisableList());
-			// 非表示セクションのチェックボックスを反映
-			$('.disableSectionCheckbox').each(function() {
-				if (getDisableSection()[$(this).attr('id')]) {
-					// チェックあり
-					$(this).prop('checked', true);
-				} else {
-					// チェックなし
-					$(this).prop('checked', false);
+			// リスト適用
+			$('td.name > a[href]').each(function() {
+				// 非表示リストの反映
+				let name = $(this).text().replace(/\r?\n/g, '');
+				if ($.inArray(name, getDisableList()) != -1) {
+					deleteRow(this);
+				}
+
+				// お気に入りリストの反映
+				if ($.inArray(name, getFavoriteList()) >= 0) {
+					// ★の色変更
+					$(this).next().removeClass(UUJ.ADD_PARTS.FavoriteMark.class).addClass(UUJ.ADD_PARTS.FavoritedMark.class);
+					// お気に入りへ移動
+					moveFavoriteRow($(this).parent().parent());
 				}
 			});
-			// お気に入りリストの中身を表示
-			$('#favoriteListText').val(getFavoriteList());
 
-			// その他の設定を表示
-			$('#topicLinefeed').prop('checked', getMiscSetting().topicLinefeed);
-			$('#topicRestore').prop('checked', getMiscSetting().topicRestore);
-			$('#niconamaLinkChange').prop('checked', getMiscSetting().niconamaLinkChange);
+			// テーブルソートの反映
+			updateTableOrder();
+
+			// サムネイル表示の反映
+			updateThumbnailSetting();
+
+			// その他の設定を反映
+			updateMiscSetting();
 
 			/////////////////////////////
-			// 設定ウィンドウ内の初期化ボタン
+			// ボタンイベント
 			/////////////////////////////
 
-			// 非表示リストを初期化ボタン
-			$('#disableListInitializeButton').on('click', function() {
-				initializeDisableListDB();
-				$('disableListText').val(getDisableList());
+			// 非表示ボタン
+			$(UUJ.ADD_PARTS.DisableButton.getSelecter()).on('click', function() {
+				let name = nameFromDisableButton($(this));
+
+				if (confirm('[' + name + ']を非表示にしますか？')) {
+					// OK
+					addDisableList(name);
+					deleteRow(this);
+				} else {
+					// cancel
+					//console.log('canceled add disable list');
+				}
 			});
-			// お気に入りリストを初期化
-			$('#favoriteListInitializeButton').on('click', function() {
-				initializeFavoriteListDB();
-				$('#favoriteListText').val(getFavoriteList());
+
+			// お気に入りボタン
+			$(document).on('click', UUJ.ADD_PARTS.FavoriteMark.getSelecter(), function() {
+				let name = nameFromDisableButton($(this));
+				if (confirm('[' + name + ']をお気に入りに追加しますか？')) {
+					// リストに追加
+					addFavoriteList(name);
+					// クラス変更
+					$(this).removeClass(UUJ.ADD_PARTS.FavoriteMark.class).addClass(UUJ.ADD_PARTS.FavoritedMark.class);
+					// お気に入りへ移動
+					moveFavoriteRow($(this).parent().parent());
+				}
 			});
-			// 非表示セクションリストを初期化
-			$('#disableSectionInitializeButton').on('click', function() {
-				initializeDisableSectionDB();
-				// チェックボックスを再反映
-				$('.disableSectionCheckbox').each(function() {
+			// お気に入り解除ボタン
+			$(document).on('click', UUJ.ADD_PARTS.FavoritedMark.getSelecter(), function() {
+				let name = nameFromDisableButton($(this));
+				if (confirm('[' + name + ']をお気に入りから削除しますか？')) {
+					let index = $.inArray(name, getFavoriteList());
+					// リストから削除
+					removeFavoriteList(index);
+					// クラス変更
+					$(this).removeClass(UUJ.ADD_PARTS.FavoritedMark.class).addClass(UUJ.ADD_PARTS.FavoriteMark.class);
+					// お気に入り外へ移動
+					removeFavoriteRow($(this).parent().parent());
+				}
+			});
+
+			// その他欄の非表示トグルボタン
+			$(UUJ.ADD_PARTS.OtherToggleButton.getSelecter()).on('click', function() {
+				toggleSection(UUJ.DB_NAMES.OTHER);
+			});
+
+			/////////////////////////////
+			// モーダルウィンドウイベント
+			/////////////////////////////
+
+			// 「.modal-open」をクリック
+			$(UUJ.ADD_PARTS.ModalOpenButton.getSelecter()).on('click', function() {
+				// 重複を防ぐ
+				if ($('div').hasClass(UUJ.ADD_PARTS.ModalOverlay.class)) {
+					$(UUJ.ADD_PARTS.ModalOverlay.getSelecter()).trigger('click');
+					return;
+				}
+
+				// オーバーレイ用の要素を追加
+				$('body').append('<div class="' + UUJ.ADD_PARTS.ModalOverlay.class + '"></div>');
+				// モーダルコンテンツのIDを取得
+				let modal = $('#mw');
+				let modalOverlay = $(UUJ.ADD_PARTS.ModalOverlay.getSelecter());
+				// オーバーレイをフェードイン
+				modalOverlay.fadeIn('slow');
+				// モーダルコンテンツの表示位置を設定
+				modalResize();
+				// モーダルコンテンツフェードイン
+				modal.fadeIn('slow');
+
+				/////////////////////////////
+				// 左メニュー処理
+				/////////////////////////////
+
+				// 左メニューのデフォルト
+				if (!$(UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li').hasClass('selected-menu')) {
+					$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecter('id')).addClass('selected-menu');
+				}
+
+				// 左メニューをクリックで右ペインを変更
+				$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecter('class')).on('click', function() {
+					// クラス切替
+					$('.selected-menu').removeClass('selected-menu');
+					$(this).addClass('selected-menu');
+
+					// 右ペインの変更
+					let id = $(this).attr('id');
+					if (id === UUJ.MODAL_WINDOW.leftMenu.menuAll.id) {
+						$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters()).toggle(true);
+					} else {
+						$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters()).toggle(false);
+						$(UUJ.MODAL_WINDOW.leftMenu[id].getSelecters()).toggle(true);
+					}
+				});
+
+				/////////////////////////////
+				// モーダルウィンドウに設定内容を表示
+				/////////////////////////////
+
+				// 非表示リストの中身を表示
+				$(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val(getDisableList());
+				// 非表示セクションのチェックボックスを反映
+				$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.firstList.getSelecter('class')).each(function() {
 					if (getDisableSection()[$(this).attr('id')]) {
 						// チェックあり
 						$(this).prop('checked', true);
@@ -516,194 +901,147 @@
 						$(this).prop('checked', false);
 					}
 				});
-			});
+				// お気に入りリストの中身を表示
+				$(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val(getFavoriteList());
 
-			/////////////////////////////
-			// 設定ウィンドウ内の保存ボタン
-			/////////////////////////////
+				// その他の設定を表示
+				Object.keys(UUJ.MODAL_WINDOW.rightPane.misc).forEach(function(key) {
+					if (typeof this[key] === 'object' && key !== 'title') {
+						Object.keys(this[key]).forEach(function(key) {
+							if (typeof this[key] === 'object' && key !== 'title') {
+								$(this[key].getSelecter('id')).prop('checked', getMiscSetting()[key]);
+							}
+						}, this[key]);
+					}
+				}, UUJ.MODAL_WINDOW.rightPane.misc);
 
-			// 非表示リストを保存ボタン
-			$('#disableListSaveButton').on('click', function() {
-				if (confirm('非表示リストを保存しますか？')) {
-					// OK
-					let dlist = $('#disableListText').val().split(',');
-					setDisableList(dlist);
-				}
-			});
-			// 非表示セクションのチェックボックス
-			$('.disableSectionCheckbox').on('change', function() {
-				let id = $(this).attr('id');
+				/////////////////////////////
+				// 設定ウィンドウ内の初期化ボタン
+				/////////////////////////////
 
-				if ($(this).is(':checked')) {
-					// チェックしたら
-					setDisableSection(id, true);
-				} else {
-					// チェックはずれたら
-					setDisableSection(id, false);
-				}
-			});
-			// お気に入りリストを保存ボタン
-			$('#favoriteListSaveButton').on('click', function() {
-				if (confirm('お気に入りリストを保存しますか？')) {
-					// OK
-					let flist = $('#favoriteListText').val().split(',');
-					setFavoriteList(flist);
-				}
-			});
-			// テーブル並び替え切り替え
-			$('.orderRadio').on('change', function() {
-				let id = $(this).attr('id');
-
-				switch (id) {
-					case 'defaultOrderRadio':
-						setTableOrder(TABLE_ORDERS.DEFAULT);
-						break;
-					case 'alphabeticalOrderRadio':
-						setTableOrder(TABLE_ORDERS.ALPHABETICAL);
-						break;
-					case 'startTimeOrderRadio':
-						setTableOrder(TABLE_ORDERS.START_TIME);
-						break;
-					case 'idOrderRadio':
-						setTableOrder(TABLE_ORDERS.ID);
-						break;
-				}
-			});
-			// サムネイルモード切替
-			$('.thumbnailCustomRadio').on('change', function() {
-				let ts = getThumbnailSetting();
-				let tsMode = $(this).attr('id');
-
-				switch (tsMode) {
-					case $('#thumbnailDefault').attr('id'):
-						ts.mode = THUMBNAIL_MODES.DEFAULT;
-						break;
-					case $('#thumbnailMouseOver').attr('id'):
-						ts.mode = THUMBNAIL_MODES.MOUSE_OVER;
-						break;
-					case $('#thumbnailAlways').attr('id'):
-						ts.mode = THUMBNAIL_MODES.ALLWAYS;
-						break;
-				}
-
-				setThumbnailSetting(ts);
-			});
-			// サムネイルサイズアスペクト比保持
-			$('#thumbnailAutoRatio').on('change', function() {
-				let ts = getThumbnailSetting();
-
-				if ($(this).prop('checked')) {
-					ts.keepAspect = true;
-				} else {
-					ts.keepAspect = false;
-				}
-
-				setThumbnailSetting(ts);
-			});
-			// サムネイルサイズ変更
-			$('#thumbnailWidth, #thumbnailHeight').on('change', function() {
-				let ts = getThumbnailSetting();
-				ts.width = Number($('#thumbnailWidth').val());
-				ts.height = Number($('#thumbnailHeight').val());
-
-				setThumbnailSetting(ts);
-			});
-
-			// 左メニューをクリックで右ペインを変更
-			$('li[id^="menu"]').on('click', function() {
-				// クラス切替
-				$('.selected-menu').removeClass('selected-menu');
-				$(this).addClass('selected-menu');
-
-				// 右ペインの変更
-				modalSelectRightPane($(this).attr('id'));
-			});
-
-			// その他の設定のチェックボックス
-			$('#topicLinefeed').on('change', function() {
-				miscSetting.topicLinefeed = !miscSetting.topicLinefeed;
-				setMiscSetting(miscSetting);
-			});
-			$('#topicRestore').on('change', function() {
-				miscSetting.topicRestore = !miscSetting.topicRestore;
-				setMiscSetting(miscSetting);
-			});
-			$('#niconamaLinkChange').on('change', function() {
-				miscSetting.niconamaLinkChange = !miscSetting.niconamaLinkChange;
-				setMiscSetting(miscSetting);
-			});
-
-			/////////////////////////////
-			// モーダルウィンドウの処理
-			/////////////////////////////
-
-			// 「.modal-overlay」あるいは「.modal-close」をクリック
-			$('.modal-overlay, #modal-close').off().on('click', function() {
-				// モーダルコンテンツとオーバーレイをフェードアウト
-				modal.fadeOut('slow');
-				modalOverlay.fadeOut('slow', function() {
-					// オーバーレイを削除
-					modalOverlay.remove();
+				// お気に入りリストを初期化
+				$(UUJ.MODAL_WINDOW.rightPane.favoriteList.initializeButton.getSelecter('id')).on('click', function() {
+					initializeFavoriteListDB();
+					$(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val(getFavoriteList());
 				});
-			});
-
-			// リサイズしたら表示位置を再設定
-			$(window).on('resize', function() {
-				modalResize();
-			});
-
-			/**
-			 * モーダルコンテンツの表示位置を設定する関数
-			 */
-			function modalResize() {
-				// モーダルコンテンツの表示位置を取得
-				let x = ($(window).width() - modal.outerWidth(true)) / 2;
-				let y = 50; //($(window).height() - modal.outerHeight(true)) / 2;
-				let width = $(window).width() * 0.75;
-
-				// モーダルコンテンツの表示位置を設定
-				modal.css({
-					'left': x + 'px',
-					'top': y + 'px',
-					'width': width + 'px',
+				// 非表示リストを初期化ボタン
+				$(UUJ.MODAL_WINDOW.rightPane.disableList.initializeButton.getSelecter('id')).on('click', function() {
+					initializeDisableListDB();
+					$(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val(getDisableList());
 				});
-			}
 
-			/**
-			 * 右ペインの表示項目を選択
-			 * @param {string} pain ペイン内divのid
-			 */
-			function modalSelectRightPane(pain) {
-				let menuAll = $('#modal-favorite, #modal-disableList, #modal-disableSection, #modal-sort, #modal-thumbnail, #modal-misc');
+				/////////////////////////////
+				// 設定ウィンドウ内の保存ボタン
+				/////////////////////////////
 
-				switch (pain) {
-					case 'menu-favorite':
-						menuAll.toggle(false);
-						$('#modal-favorite').toggle(true);
-						break;
-					case 'menu-disable':
-						menuAll.toggle(false);
-						$('#modal-disableList, #modal-disableSection').toggle(true);
-						break;
-					case 'menu-sort':
-						menuAll.toggle(false);
-						$('#modal-sort').toggle(true);
-						break;
-					case 'menu-thumbnail':
-						menuAll.toggle(false);
-						$('#modal-thumbnail').toggle(true);
-						break;
-					case 'menu-misc':
-						menuAll.toggle(false);
-						$('#modal-misc').toggle(true);
-						break;
-					case 'menu-all':
-					default:
-						menuAll.toggle(true);
-						break;
+				// お気に入りリストを保存ボタン
+				$(UUJ.MODAL_WINDOW.rightPane.favoriteList.saveButton.getSelecter('id')).on('click', function() {
+					if (confirm('お気に入りリストを保存しますか？')) {
+						// OK
+						let flist = $(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val().split(',');
+						setFavoriteList(flist);
+					}
+				});
+				// 非表示リストを保存ボタン
+				$(UUJ.MODAL_WINDOW.rightPane.disableList.saveButton.getSelecter('id')).on('click', function() {
+					if (confirm('非表示リストを保存しますか？')) {
+						// OK
+						let dlist = $(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val().split(',');
+						setDisableList(dlist);
+					}
+				});
+
+				/////////////////////////////
+				// 設定ウィンドウ内のチェックボックス
+				/////////////////////////////
+
+				// 非表示セクションのチェックボックス
+				$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.firstList.getSelecter('class')).on('change', function() {
+					setDisableSection($(this).attr('id'), $(this).is(':checked'));
+				});
+				// サムネイルサイズアスペクト比保持
+				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.keepAspect.item.getSelecter('id')).on('change', function() {
+					let ts = getThumbnailSetting();
+
+					ts.keepAspect = $(this).prop('checked');
+
+					setThumbnailSetting(ts);
+				});
+
+				/////////////////////////////
+				// 設定ウィンドウ内のラジオボックス
+				/////////////////////////////
+
+				// テーブル並び替え切り替え
+				$(UUJ.MODAL_WINDOW.rightPane.tableOrder.default.getSelecter('class')).on('change', function() {
+					setTableOrder(UUJ.MODAL_WINDOW.rightPane.tableOrder[$(this).attr('id')].replace(/OrderRadio$/g, '').tableOrder);
+				});
+				// サムネイルモード切替
+				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.getSelecter('class')).on('change', function() {
+					let ts = getThumbnailSetting();
+
+					ts.mode = UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[$(this).attr('id').replace(/^thumbnail/g, '').toLowerCase()].mode;
+
+					setThumbnailSetting(ts);
+				});
+
+				/////////////////////////////
+				// 設定ウィンドウ内の数字ボックス
+				/////////////////////////////
+
+				// サムネイルサイズ変更
+				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('class')).on('change', function() {
+					let ts = getThumbnailSetting();
+					ts.width = Number($(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('id')).val());
+					ts.height = Number($(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.height.item.getSelecter('id')).val());
+
+					setThumbnailSetting(ts);
+				});
+
+				// その他の設定のチェックボックス
+				$(UUJ.MODAL_WINDOW.rightPane.misc.getItemClass()).on('change', function() {
+					let ms = getMiscSetting();
+					ms[$(this).attr('id')] = !ms[$(this).attr('id')];
+					setMiscSetting(ms);
+				});
+
+				/////////////////////////////
+				// モーダルウィンドウの処理
+				/////////////////////////////
+
+				// 「.modal-overlay」あるいは「.modal-close」をクリック
+				$(UUJ.ADD_PARTS.ModalOverlay.getSelecter() + ', #modal-close').off().on('click', function() {
+					// モーダルコンテンツとオーバーレイをフェードアウト
+					modal.fadeOut('slow');
+					modalOverlay.fadeOut('slow', function() {
+						// オーバーレイを削除
+						modalOverlay.remove();
+					});
+				});
+
+				// リサイズしたら表示位置を再設定
+				$(window).on('resize', function() {
+					modalResize();
+				});
+
+				/**
+				 * モーダルコンテンツの表示位置を設定する関数
+				 */
+				function modalResize() {
+					// モーダルコンテンツの表示位置を取得
+					let x = ($(window).width() - modal.outerWidth(true)) / 2;
+					let y = 50; //($(window).height() - modal.outerHeight(true)) / 2;
+					let width = $(window).width() * 0.75;
+
+					// モーダルコンテンツの表示位置を設定
+					modal.css({
+						'left': x + 'px',
+						'top': y + 'px',
+						'width': width + 'px',
+					});
 				}
-			}
-		});
+			});
+		}
 	});
 
 	/////////////////////////////
@@ -714,14 +1052,14 @@
 	 * 非表示リストを初期化
 	 */
 	function initializeDisableListDB() {
-		if (GM_getValue(DB_NAMES.DISABLE_LIST) != undefined) {
+		if (DisableList != undefined) {
 			if (!confirm('非表示リストを初期化しますか？')) {
 				return;
 			}
 		}
 
-		GM_setValue(DB_NAMES.DISABLE_LIST, []);
-		disableList = GM_getValue(DB_NAMES.DISABLE_LIST);
+		GM.setValue(UUJ.DB_NAMES.DISABLE_LIST, []);
+		DisableList = [];
 	}
 
 	/**
@@ -729,15 +1067,11 @@
 	 * @return {Array.<string>}
 	 */
 	function getDisableList() {
-		if (disableList == undefined) {
-			if (GM_getValue(DB_NAMES.DISABLE_LIST) == undefined) {
-				initializeDisableListDB();
-			}
-
-			disableList = GM_getValue(DB_NAMES.DISABLE_LIST);
+		if (DisableList === undefined) {
+			initializeDisableListDB();
 		}
 
-		return disableList;
+		return DisableList;
 	}
 
 	/**
@@ -745,8 +1079,8 @@
 	 * @param {Array.<string>} list 非表示リスト
 	 */
 	function setDisableList(list) {
-		GM_setValue(DB_NAMES.DISABLE_LIST, list);
-		//console.log('save ' + DISABLE_LIST_DB_NAME);
+		DisableList = list;
+		GM.setValue(UUJ.DB_NAMES.DISABLE_LIST, list);
 	}
 
 	/**
@@ -754,9 +1088,9 @@
 	 * @param {string} name 配信者名
 	 */
 	function addDisableList(name) {
-		disableList.push(name);
+		DisableList.push(name);
 
-		setDisableList(disableList);
+		setDisableList(DisableList);
 	}
 
 	/////////////////////////////
@@ -767,7 +1101,7 @@
 	 * 非表示セクションデータベースを初期化
 	 */
 	function initializeDisableSectionDB() {
-		if (GM_getValue(DB_NAMES.DISABLE_SECTION) != undefined) {
+		if (DisableSection != undefined) {
 			if (!confirm('非表示リストを初期化しますか？')) {
 				return;
 			}
@@ -780,8 +1114,8 @@
 			EVENT_TICKER_DB_NAME: false,
 		};
 
-		GM_setValue(DB_NAMES.DISABLE_SECTION, dsInitial);
-		disableSection = GM_getValue(DB_NAMES.DISABLE_SECTION);
+		GM.setValue(UUJ.DB_NAMES.DISABLE_SECTION, dsInitial);
+		DisableSection = dsInitial;
 	}
 
 	/**
@@ -789,15 +1123,11 @@
 	 * @return {Array.<string,boolean>} 非表示セクション
 	 */
 	function getDisableSection() {
-		if (disableSection == undefined) {
-			if (GM_getValue(DB_NAMES.DISABLE_SECTION) == undefined) {
-				initializeDisableSectionDB();
-			}
-
-			disableSection = GM_getValue(DB_NAMES.DISABLE_SECTION);
+		if (DisableSection === undefined) {
+			initializeDisableSectionDB();
 		}
 
-		return disableSection;
+		return DisableSection;
 	}
 
 	/**
@@ -809,8 +1139,8 @@
 		let ds = getDisableSection();
 		ds[section] = bool;
 
-		disableSection = ds;
-		GM_setValue(DB_NAMES.DISABLE_SECTION, ds);
+		DisableSection = ds;
+		GM.setValue(UUJ.DB_NAMES.DISABLE_SECTION, ds);
 		updateDisableSection();
 	}
 
@@ -818,27 +1148,18 @@
 	 * 非表示セクションを更新
 	 */
 	function updateDisableSection() {
-		let firstListSection = $('.noblk').first();
-		let secondListSection = $('.noblk').eq(1);
-		let otherSection = $('#otherToggle');
-		let otherToggleButton = $('#otherToggleButton');
-		let eventTicker = $('.ticker');
-		let ds = getDisableSection();
+		// セクション
+		$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.firstList.selecter).toggle(!getDisableSection()[UUJ.DB_NAMES.FIRST_LIST]);
 
-		firstListSection.toggle((ds[DB_NAMES.FIRST_LIST]) ? false : true);
-		secondListSection.toggle((ds[DB_NAMES.SECOND_LIST]) ? false : true);
+		$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.secondList.selecter).toggle(!getDisableSection()[UUJ.DB_NAMES.SECOND_LIST]);
 
-		if (ds[DB_NAMES.OTHER]) {
-			otherSection.toggle(false);
-			// ボタンテキストを変更
-			otherToggleButton.val('その他の情報を展開');
-		} else {
-			otherSection.toggle(true);
-			// ボタンテキストを変更
-			otherToggleButton.val('その他の情報を格納');
-		}
+		$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.other.selecter).toggle(!getDisableSection()[UUJ.DB_NAMES.OTHER]);
+		// ボタンテキストを変更
+		$(UUJ.ADD_PARTS.OtherToggleButton.getSelecter()).val(getDisableSection()[UUJ.DB_NAMES.OTHER] ? UUJ.ADD_PARTS.OtherToggleButton.openLabel : UUJ.ADD_PARTS.OtherToggleButton.closeLabel);
 
-		eventTicker.toggle((ds[DB_NAMES.OTHER]) ? false : true);
+		// イベントバー
+		$('.ticker').insertBefore('.noblk:first');
+		$(UUJ.MODAL_WINDOW.rightPane.disableSection.other.eventTicker.selecter).toggle(!getDisableSection()[UUJ.DB_NAMES.OTHER]);
 	}
 
 	/**
@@ -849,22 +1170,22 @@
 		let ds = getDisableSection();
 
 		switch (section) {
-			case DB_NAMES.FIRST_LIST:
-				ds[DB_NAMES.FIRST_LIST] = !ds[DB_NAMES.FIRST_LIST];
+			case UUJ.DB_NAMES.FIRST_LIST:
+				ds[UUJ.DB_NAMES.FIRST_LIST] = !ds[UUJ.DB_NAMES.FIRST_LIST];
 				break;
-			case DB_NAMES.SECOND_LIST:
-				ds[DB_NAMES.SECOND_LIST] = !ds[DB_NAMES.SECOND_LIST];
+			case UUJ.DB_NAMES.SECOND_LIST:
+				ds[UUJ.DB_NAMES.SECOND_LIST] = !ds[UUJ.DB_NAMES.SECOND_LIST];
 				break;
-			case DB_NAMES.OTHER:
-				ds[DB_NAMES.OTHER] = !ds[DB_NAMES.OTHER];
+			case UUJ.DB_NAMES.OTHER:
+				ds[UUJ.DB_NAMES.OTHER] = !ds[UUJ.DB_NAMES.OTHER];
 				break;
-			case DB_NAMES.EVENT_TICKER:
-				ds[DB_NAMES.EVENT_TICKER] = !ds[DB_NAMES.EVENT_TICKER];
+			case UUJ.DB_NAMES.EVENT_TICKER:
+				ds[UUJ.DB_NAMES.EVENT_TICKER] = !ds[UUJ.DB_NAMES.EVENT_TICKER];
 				break;
 		}
 
-		disableSection = ds;
-		GM_setValue(DB_NAMES.DISABLE_SECTION, ds);
+		DisableSection = ds;
+		GM.setValue(UUJ.DB_NAMES.DISABLE_SECTION, ds);
 		updateDisableSection();
 	}
 
@@ -876,14 +1197,14 @@
 	 * お気に入りリストを初期化
 	 */
 	function initializeFavoriteListDB() {
-		if (GM_getValue(DB_NAMES.FAVORITE_LIST) != undefined) {
+		if (FavoriteList != undefined) {
 			if (!confirm('お気に入りリストを初期化しますか？')) {
 				return;
 			}
 		}
 
-		GM_setValue(DB_NAMES.FAVORITE_LIST, []);
-		FavoriteList = GM_getValue(DB_NAMES.FAVORITE_LIST);
+		GM.setValue(UUJ.DB_NAMES.FAVORITE_LIST, []);
+		FavoriteList = [];
 	}
 
 	/**
@@ -891,12 +1212,8 @@
 	 * @return {Array.<string>} お気に入りリスト
 	 */
 	function getFavoriteList() {
-		if (FavoriteList == undefined) {
-			if (GM_getValue(DB_NAMES.FAVORITE_LIST) == undefined) {
-				initializeFavoriteListDB();
-			}
-
-			FavoriteList = GM_getValue(DB_NAMES.FAVORITE_LIST);
+		if (FavoriteList === undefined) {
+			initializeFavoriteListDB();
 		}
 
 		return FavoriteList;
@@ -907,7 +1224,8 @@
 	 * @param {Array.<string>} list お気に入りリスト
 	 */
 	function setFavoriteList(list) {
-		GM_setValue(DB_NAMES.FAVORITE_LIST, list);
+		FavoriteList = list;
+		GM.setValue(UUJ.DB_NAMES.FAVORITE_LIST, list);
 		//console.log('save ' + FAVORITE_LIST_DB_NAME);
 	}
 
@@ -937,25 +1255,26 @@
 	 */
 	function moveFavoriteRow(row) {
 		// 2次から1次へ変換
-		if ($(row).parents('table').attr('id') == 'secondList') {
-			// 経過時間と開始時間を結合
-			let dur = $(row).find('span.duration').prop('outerHTML');
-			let date = $(row).find('span.date').prop('outerHTML');
-			// 配信サイトの画像を変更
+		if ($(row).parents('table').attr('id') === 'secondList') {
+			// 配信サイトの画像を一次用に変更
 			$(row).find('td.status a > img').attr('src', function() {
 				return $(this).attr('src').replace(/_s/g, '');
 			});
+
 			// 視聴者数
 			$(row).find('.viewers').html(
 				'<span class="viewersNum">' + $(row).find('.viewers').text() + '</span>'
 			);
 
-			// 適用
+			// 経過時間と開始時間を結合
+			let dur = $(row).find('span.duration').prop('outerHTML');
+			let date = $(row).find('span.date').prop('outerHTML');
 			$(row).find('td.lastDate').html(dur + '<br>' + date);
 			$(row).find('td.duration').remove();
 		}
+
 		// 移動
-		$(row).removeClass('invisible').addClass('favorite').insertBefore($('#firstList tr').not('.favorite').eq(1));
+		$(row).removeClass('invisible').removeClass('hidden_offline').addClass('favorite').insertBefore($('#firstList tr').not('.favorite').eq(1));
 		// クラスが空のときofflineを追加
 		if ($(row).hasClass('favorite') && !$(row).hasClass('online')) {
 			$(row).addClass('offline');
@@ -975,7 +1294,7 @@
 	 */
 	function removeFavoriteRow(row) {
 		// 移動
-		$(row).removeClass('favorite').insertBefore($('#firstList tr.offline').first());
+		$(row).removeClass('favorite').insertBefore($('#firstList tr.offline:not(.favorite)').first());
 		// クラスが空のときinvisibleを追加
 		if (!$(row).hasClass('online') && !$(row).hasClass('offline')) {
 			$(row).addClass('invisible');
@@ -990,28 +1309,38 @@
 	function getTimeSinceEnd(date) {
 		// 現在時刻
 		let now = new Date();
+
+		// 終了時間
 		// 先頭の波を削除
-		date = date.replace(/^～/, '');
-		// 文字列から時間(秒)に変換
-		let time = (now.getTime() - new Date(now.getFullYear(),
+		let end = date.replace(/^～/, '');
+		// Dateに変換
+		end = new Date(now.getFullYear(),
 			('0' + date.match(/\d+/)).slice(-2) - 1,
 			('0' + date.match(/\d+(?=\s)/)).slice(-2),
 			date.match(/\d+(?=:)/),
 			date.match(/\d+$/),
-			0)) / 1000;
+			0);
+
+		// 時間差(秒)
+		let time = (now.getTime() - end) / 1000;
+		// 年跨ぎ
+		if (time < 0) {
+			time = 31536000 + time;
+		}
+
 		// ミリ秒から時間へ変換
-		if (time / 60 < 60) {
+		if ((time / 60) < 60) {
 			// 60分以内
-			return '～' + Math.round(time / 60) + '分前';
-		} else if (time / 3600 < 24) {
+			return '～' + Math.floor(time / 60) + '分前';
+		} else if ((time / 3600) < 24) {
 			// 24時間以内
-			return '～' + Math.round(time / 3600) + '時間前';
-		} else if (time / 86400 < 360) {
+			return '～' + Math.floor(time / 3600) + '時間前';
+		} else if ((time / 86400) < 360) {
 			// 360日以内
-			return '～' + Math.round(time / 86400) + '日前';
+			return '～' + Math.floor(time / 86400) + '日前';
 		} else {
 			// 1年以上
-			return '～' + Math.round(time / 31104000) + '年前';
+			return '～1年以上前';
 		}
 	}
 
@@ -1023,14 +1352,14 @@
 	 * テーブル並び替え設定を初期化
 	 */
 	function initializeTableOrderDB() {
-		if (GM_getValue(DB_NAMES.TABLE_ORDER) != undefined) {
+		if (TableOrder != undefined) {
 			if (!confirm('並び替えを初期化しますか？')) {
 				return;
 			}
 		}
 
-		GM_setValue(DB_NAMES.TABLE_ORDER, TABLE_ORDERS.DEFAULT);
-		TableOrder = GM_getValue(DB_NAMES.TABLE_ORDER);
+		GM.setValue(UUJ.DB_NAMES.TABLE_ORDER, UUJ.MODAL_WINDOW.rightPane.tableOrder.default.tableOrder);
+		TableOrder = UUJ.MODAL_WINDOW.rightPane.tableOrder.default.tableOrder;
 	}
 
 	/**
@@ -1038,12 +1367,8 @@
 	 * @return {string} テーブル並び替え設定
 	 */
 	function getTableOrder() {
-		if (TableOrder == undefined) {
-			if (GM_getValue(DB_NAMES.TABLE_ORDER) == undefined) {
-				initializeTableOrderDB();
-			}
-
-			TableOrder = GM_getValue(DB_NAMES.TABLE_ORDER);
+		if (TableOrder === undefined) {
+			initializeTableOrderDB();
 		}
 
 		return TableOrder;
@@ -1055,7 +1380,7 @@
 	 */
 	function setTableOrder(order) {
 		TableOrder = order;
-		GM_setValue(DB_NAMES.TABLE_ORDER, TableOrder);
+		GM.setValue(UUJ.DB_NAMES.TABLE_ORDER, TableOrder);
 		updateTableOrder(false);
 	}
 
@@ -1063,60 +1388,16 @@
 	 * テーブルのソート順を更新
 	 * @param {boolean} firstFlag 初期更新かどうか
 	 */
-	function updateTableOrder(firstFlag) {
-		switch (getTableOrder()) {
-			case TABLE_ORDERS.DEFAULT:
-				if (firstFlag) {
-					$('#defaultOrderRadio').prop('checked', true);
-					break;
-				} else {
-					reorderDefault();
-					break;
-				}
-			case TABLE_ORDERS.ALPHABETICAL:
-				if (firstFlag) {
-					$('#alphabeticalOrderRadio').prop('checked', true);
-					reorderAlphabetical();
-					break;
-				} else {
-					if (confirm('ページを更新します')) {
-						location.reload();
-					}
-					break;
-				}
-			case TABLE_ORDERS.START_TIME:
-				if (firstFlag) {
-					$('#startTimeOrderRadio').prop('checked', true);
-					reorderStartTime();
-					break;
-				} else {
-					if (confirm('ページを更新します')) {
-						location.reload();
-					}
-					break;
-				}
-			case TABLE_ORDERS.ID:
-				if (firstFlag) {
-					$('#idOrderRadio').prop('checked', true);
-					reorderId();
-					break;
-				} else {
-					if (confirm('ページを更新します')) {
-						location.reload();
-					}
-					break;
-				}
-		}
-	}
-
-	/**
-	 * テーブル並び替えをデフォルトにする
-	 */
-	function reorderDefault() {
-		// デフォルト
-		//console.log('def');
-		if (confirm('ページを更新します')) {
-			location.reload();
+	function updateTableOrder(firstFlag = true) {
+		if (firstFlag) {
+			// チェックボックスを更新
+			$(UUJ.MODAL_WINDOW.rightPane.tableOrder[getTableOrder()].getSelecter('id')).prop('checked', true);
+			// オーダー実行
+			UUJ.MODAL_WINDOW.rightPane.tableOrder[getTableOrder()].execute();
+		} else {
+			if (confirm('ページを更新します')) {
+				location.reload();
+			}
 		}
 	}
 
@@ -1284,18 +1565,17 @@
 	 * @return {string} 配信者名
 	 */
 	function nameFromDisableButton(button) {
-		return $(button).prev().prev().text().replace(/\r?\n/g, '');
-		// return $(button).parent().prevAll('td.name').children('a').text().replace(/\r?\n/g, '');
+		return $(button).prevAll('a[href]').first().text().replace(/\r?\n/g, '');
 	}
 
-	/**
-	 * お気に入りボタンから配信者名を取得
-	 * @param {Object} favoriteMark お気に入りボタン
-	 * @return {string} 配信者名
-	 */
-	function nameFromFavoriteButton(favoriteMark) {
-		return $(favoriteMark).prev().text().replace(/\r?\n/g, '');
-	}
+	// /**
+	//  * お気に入りボタンから配信者名を取得
+	//  * @param {Object} favoriteMark お気に入りボタン
+	//  * @return {string} 配信者名
+	//  */
+	// function nameFromFavoriteButton(favoriteMark) {
+	// 	return $(favoriteMark).prev().text().replace(/\r?\n/g, '');
+	// }
 
 	/**
 	 * ボタンのあるテーブルの行を削除
@@ -1303,7 +1583,6 @@
 	 */
 	function deleteRow(button) {
 		$(button).parent().parent().remove();
-		// console.log($(button).prev().text().replace(/\r?\n/g,'') + ' delete');
 	}
 
 	/////////////////////////////
@@ -1314,20 +1593,21 @@
 	 * サムネイル設定を初期化
 	 */
 	function initializeThumbnailSetting() {
-		if (GM_getValue(DB_NAMES.THUMBNAIL_SETTING) != undefined) {
+		if (ThumbnailSetting != undefined) {
 			if (!confirm('サムネイル設定を初期化しますか？')) {
 				return;
 			}
 		}
 
-		GM_setValue(DB_NAMES.THUMBNAIL_SETTING, {
-			mode: THUMBNAIL_MODES.DEFAULT,
+		let tsInitial = {
+			mode: UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.mode,
 			keepAspect: true,
 			width: 50,
 			height: 50,
-		});
+		};
 
-		thumbnailSetting = GM_getValue(DB_NAMES.THUMBNAIL_SETTING);
+		GM.setValue(UUJ.DB_NAMES.THUMBNAIL_SETTING, tsInitial);
+		ThumbnailSetting = tsInitial;
 	}
 
 	/**
@@ -1335,15 +1615,11 @@
 	 * @return {Object} サムネイル設定
 	 */
 	function getThumbnailSetting() {
-		if (thumbnailSetting == undefined) {
-			if (GM_getValue(DB_NAMES.THUMBNAIL_SETTING) == undefined) {
-				initializeThumbnailSetting();
-			}
-
-			thumbnailSetting = GM_getValue(DB_NAMES.THUMBNAIL_SETTING);
+		if (ThumbnailSetting === undefined) {
+			initializeThumbnailSetting();
 		}
 
-		return thumbnailSetting;
+		return ThumbnailSetting;
 	}
 
 	/**
@@ -1351,7 +1627,8 @@
 	 * @param {Object} setting サムネイル設定
 	 */
 	function setThumbnailSetting(setting) {
-		GM_setValue(DB_NAMES.THUMBNAIL_SETTING, setting);
+		ThumbnailSetting = setting;
+		GM.setValue(UUJ.DB_NAMES.THUMBNAIL_SETTING, setting);
 		updateThumbnailSetting(false);
 	}
 
@@ -1359,59 +1636,54 @@
 	 * サムネイル表示を更新
 	 * @param {boolean} firstFlag 初期か
 	 */
-	function updateThumbnailSetting(firstFlag) {
+	function updateThumbnailSetting(firstFlag = true) {
 		if (firstFlag) {
 			let ts = getThumbnailSetting();
-			applyThumbnailMode(ts.mode);
+			// モードを適用
+			UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[ts.mode].execute();
 
-
-			// 横指定
+			// CSS 横指定
 			let style = '.thumbnail { width: ' + ts.width + 'px; ';
 			if (!ts.keepAspect) {
 				// 縦指定
 				style += 'height: ' + ts.height + 'px; ';
 			}
 			style += '}';
-
 			let css = $('head style:contains(".thumbnail {")');
 			if (css.length != 0) {
 				css.text(style);
 			} else {
-				GM_addStyle(style);
+				addStyle(style);
 			}
 
-			switch (ts.mode) {
-				case THUMBNAIL_MODES.DEFAULT:
-					$('#thumbnailDefault').prop('checked', true);
-					$('.thumbnailSize').hide();
-					return;
-				case THUMBNAIL_MODES.MOUSE_OVER:
-					$('#thumbnailMouseOver').prop('checked', true);
-					break;
-				case THUMBNAIL_MODES.ALLWAYS:
-					$('#thumbnailAlways').prop('checked', true);
-					break;
-			}
+			// モーダルウィンドウ内に反映
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[ts.mode].getSelecter('id')).prop('checked', true);
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.getSelecter()).toggle((ts.mode === UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.mode) ? false : true);
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.keepAspect.item.getSelecter('id')).prop('checked', ts.keepAspect);
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('id')).val(ts.width);
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.height.item.getSelecter('id')).val(ts.height);
 
-			$('#thumbnailAutoRatio').prop('checked', ts.keepAspect);
-			$('#thumbnailWidth').val(ts.width);
-			$('#thumbnailHeight').val(ts.height);
 
 			if (ts.keepAspect) {
-				$('img.thumbnailSampleImage').attr('width', ts.width).removeAttr('height').next().text(ts.width + 'px : ' + 'auto');
-
-				$('#sampleImageHeight').hide();
+				$('img' + UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.item.image.getSelecter('class')).attr('width', ts.width).removeAttr('height').next().text(ts.width + 'px : ' + 'auto');
 			} else {
-				$('img.thumbnailSampleImage').attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px : ' + ts.height + 'px');
-				$('#sampleImageHeight').show();
+				$('img' + UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.item.image.getSelecter('class')).attr('width', ts.width).attr('height', ts.height).next().text(ts.width + 'px : ' + ts.height + 'px');
 			}
-			$('div.thumbnailSampleImage').css({
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.height.getSelecter('id')).toggle(!ts.keepAspect);
+
+			$('div' + UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.item.image.getSelecter('class')).css({
 				'width': ts.width,
 				'height': ts.width * 0.5625 + 30 + 'px',
 			});
 
 			// サンプル画像を設定
-			$('img.thumbnailSampleImage').attr('src', $('img[onmouseover]').first().attr('onmouseover').split('\'')[1]);
+			$('img' + UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.item.image.getSelecter()).attr('src', function() {
+				if ($('img[onmouseover]').length) {
+					return $('img[onmouseover]').first().attr('onmouseover').split('\'')[1];
+				} else {
+					return $('img.r').first().attr('src');
+				}
+			});
 		} else {
 			if (confirm('ページを更新します')) {
 				location.reload();
@@ -1419,64 +1691,35 @@
 		}
 	}
 
-	/**
-	 * サムネイル表示方法を変更
-	 * @param {string} mode モード
-	 */
-	function applyThumbnailMode(mode) {
-		switch (mode) {
-			case THUMBNAIL_MODES.DEFAULT:
-				break;
-			case THUMBNAIL_MODES.MOUSE_OVER:
-				// マウスオーバー
-				$('.popup').each(function() {
-					let a = $(this).find('a');
-					// 通常画像
-					$(a).find('img').not('[alt="beam"]').eq(1).attr('onmouseover', 'this.src=\'' + $(a).find('img').eq(0).attr('src') + '\';this.className=\'thumbnail\';').attr('onmouseout', 'this.src=\'' + $(a).find('img').eq(1).attr('src') + '\';this.className=\'\';');
-					// videoタグ
-					$(a).find('video').hide().parent('a').hover(
-						function() {
-							$(this).find('video').show();
-							$(this).find('img').hide();
-						},
-						function() {
-							$(this).find('video').hide();
-							$(this).find('img').show();
-						}
-					);
-
-					// 適用
-					$(a).find('img.r').remove();
-					$(a).appendTo($(this).parent('td.status'));
-					$(this).remove();
-				});
-				break;
-			case THUMBNAIL_MODES.ALLWAYS:
-				break;
-		}
-	}
-
 	/////////////////////////////
-	// サムネイル設定
+	// その他の設定
 	/////////////////////////////
 
 	/**
 	 * その他の設定を初期化
 	 */
 	function initializeMiscSettingDB() {
-		if (GM_getValue(DB_NAMES.MISC_SETTING) != undefined) {
+		// 存在しない場合
+		if (MiscSetting != undefined) {
 			if (!confirm('その他の設定を初期化しますか？')) {
 				return;
 			}
 		}
 
-		GM_setValue(DB_NAMES.MISC_SETTING, {
-			topicLinefeed: false,
-			topicRestore: false,
-			niconamaLinkChange: false,
-		});
+		// 初期設定を生成
+		let initial = {};
+		Object.keys(UUJ.MODAL_WINDOW.rightPane.misc).forEach(function(key) {
+			if (typeof this[key] === 'object' && this[key].type === undefined) {
+				Object.keys(this[key]).forEach(function(key) {
+					if (typeof this[key] === 'object' && key !== 'title') {
+						initial[key] = false;
+					}
+				}, this[key]);
+			}
+		}, UUJ.MODAL_WINDOW.rightPane.misc);
 
-		miscSetting = GM_getValue(DB_NAMES.MISC_SETTING);
+		GM.setValue(UUJ.DB_NAMES.MISC_SETTING, initial);
+		MiscSetting = initial;
 	}
 
 	/**
@@ -1484,15 +1727,11 @@
 	 * @return {object} その他の設定
 	 */
 	function getMiscSetting() {
-		if (miscSetting == undefined) {
-			if (GM_getValue(DB_NAMES.MISC_SETTING) == undefined) {
-				initializeMiscSettingDB();
-			}
-
-			miscSetting = GM_getValue(DB_NAMES.MISC_SETTING);
+		if (MiscSetting === undefined) {
+			initializeMiscSettingDB();
 		}
 
-		return miscSetting;
+		return MiscSetting;
 	}
 
 	/**
@@ -1500,6 +1739,107 @@
 	 * @param {object} setting その他の設定
 	 */
 	function setMiscSetting(setting) {
-		GM_setValue(DB_NAMES.MISC_SETTING, setting);
+		MiscSetting = setting;
+		GM.setValue(UUJ.DB_NAMES.MISC_SETTING, setting);
+	}
+
+	/**
+	 * その他の設定を更新
+	 * @param {boolean} [firstFlag=true] 初期かどうか
+	 */
+	function updateMiscSetting(firstFlag = true) {
+		if (firstFlag) {
+			Object.keys(UUJ.MODAL_WINDOW.rightPane.misc).forEach(function(key) {
+				if (typeof this[key] === 'object' && this[key].type === undefined) {
+					Object.keys(this[key]).forEach(function(key) {
+						if (typeof this[key] === 'object' && key !== 'title') {
+							if (getMiscSetting()[key]) {
+								this[key].execute();
+							}
+						}
+					}, this[key]);
+				}
+			}, UUJ.MODAL_WINDOW.rightPane.misc);
+		} else {
+			if (confirm('ページを更新します')) {
+				location.reload();
+			}
+		}
+	}
+
+	/////////////////////////////
+	// その他の関数
+	/////////////////////////////
+
+	/**
+	 * addStyle
+	 * @param {string} css css
+	 */
+	function addStyle(css) {
+		let head = document.getElementsByTagName('head')[0];
+		if (head) {
+			let style = document.createElement('style');
+			style.setAttribute('type', 'text/css');
+			style.textContent = css;
+			head.appendChild(style);
+		}
+	}
+
+	/**
+	 * objectからタグを生成する
+	 * @param {object} object オブジェクト
+	 * @return {string} タグ
+	 */
+	function generateTagFromObject(object) {
+		let tag;
+		switch (object.type) {
+			case 'title':
+				tag = '<h3>' + object.value + '</h3>';
+				break;
+			case 'info':
+				tag = '<p class="' + object.class + '">' + object.value + '</p>';
+				break;
+			case 'button':
+				tag = '<input type="button" class="' + object.class + '" id="' + object.id + '" value="' + object.value + '">';
+				break;
+			case 'checkbox':
+				tag = '<input type="checkbox" class="' + object.class + '" id="' + object.id + '"><label for="' + object.id + '">' + object.label + '</label>';
+				break;
+			case 'radio':
+				tag = '<input type="radio" class="' + object.class + '" id="' + object.id + '" name="' + object.name + '"><label for="' + object.id + '">' + object.label + '</label>';
+				break;
+			case 'number':
+				tag = object.beforeLabel + '<input type="number" class="' + object.class + '" id="' + object.id + '" value="150" min="50">' + object.afterLabel;
+				break;
+			case 'textarea':
+				tag = '<textarea value="" id="' + object.id + '" rows="5" style="width:100%; max-width:100%; min-width:100%;" wrap="hard"></textarea>';
+				break;
+			case 'image':
+				tag = '<img class="' + object.class + '" alt="' + object.alt + '" width="150px" height="150px" src="./img/ust_s.png">';
+				break;
+			case 'figcaption':
+				tag = '<figcaption>' + object.value + '</figcaption>';
+				break;
+			case 'link':
+				tag = '<a class="' + object.class + '" title="' + object.label + '">' + object.value + '</a>';
+				break;
+			default:
+				tag = undefined;
+				break;
+		}
+
+		// 改行
+		if (object.linefeed) {
+			tag += '<br>';
+		}
+
+		return tag;
+	}
+
+	/**
+	 * debug
+	 */
+	function debug() {
+		//console.log(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters());
 	}
 })();
