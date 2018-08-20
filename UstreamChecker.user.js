@@ -979,8 +979,10 @@
 				// サムネイルモード切替
 				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.getSelecter('class')).on('change', function() {
 					let ts = getThumbnailSetting();
+					let mode = $(this).attr('id').replace(/^thumbnail/g, '');
+                    mode = mode.charAt(0).toLowerCase() + mode.slice(1);
 
-					ts.mode = UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[$(this).attr('id').replace(/^thumbnail/g, '').toLowerCase()].mode;
+					ts.mode = UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[mode].mode;
 
 					setThumbnailSetting(ts);
 				});
@@ -1658,7 +1660,7 @@
 
 			// モーダルウィンドウ内に反映
 			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[ts.mode].getSelecter('id')).prop('checked', true);
-			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.getSelecter()).toggle((ts.mode === UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.mode) ? false : true);
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.getSelecter()).toggle((ts.mode === UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.mode) ? false : true);
 			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.keepAspect.item.getSelecter('id')).prop('checked', ts.keepAspect);
 			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('id')).val(ts.width);
 			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.height.item.getSelecter('id')).val(ts.height);
