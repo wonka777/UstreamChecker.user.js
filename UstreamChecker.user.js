@@ -979,8 +979,7 @@
 				// サムネイルモード切替
 				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.getSelecter('class')).on('change', function() {
 					let ts = getThumbnailSetting();
-					let mode = $(this).attr('id').replace(/^thumbnail/g, '');
-                    mode = mode.charAt(0).toLowerCase() + mode.slice(1);
+					let mode = lowerCaseFirst($(this).attr('id').replace(/^thumbnail/g, ''));
 
 					ts.mode = UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[mode].mode;
 
@@ -1836,6 +1835,16 @@
 		}
 
 		return tag;
+	}
+
+	/**
+	 * 文字列の先頭を小文字にする
+	 *
+	 * @param {string} string
+	 * @return {string}
+	 */
+	function lowerCaseFirst(string) {
+		return string.charAt(0).toLowerCase() + string.slice(1);
 	}
 
 	/**
