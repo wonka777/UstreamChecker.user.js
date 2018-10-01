@@ -590,460 +590,454 @@
 	}
 
 	/////////////////////////////
-	// ページ読み込み後
+	// prototype拡張
 	/////////////////////////////
 
-	$(window).load(function() {
-		/////////////////////////////
-		// prototype拡張
-		/////////////////////////////
-
-		// セレクタを取得する関数を追加
-		window.Object.defineProperty(Object.prototype, 'getSelecter', {
-			value: function(o = 'exist') {
-				if (o === 'exist') {
-					if (this.class !== undefined) {
-						return '.' + this.class;
-					} else if (this.id !== undefined) {
-						return '#' + this.id;
-					} else {
-						return undefined;
-					}
-				} else if (o === 'class' && this.class !== undefined) {
+	// セレクタを取得する関数を追加
+	window.Object.defineProperty(Object.prototype, 'getSelecter', {
+		value: function(o = 'exist') {
+			if (o === 'exist') {
+				if (this.class !== undefined) {
 					return '.' + this.class;
-				} else if (o === 'id' && this.id !== undefined) {
+				} else if (this.id !== undefined) {
 					return '#' + this.id;
 				} else {
 					return undefined;
 				}
-			},
-		});
-
-		debug();
-
-		/////////////////////////////
-		// 追加するボタンの処理
-		/////////////////////////////
-
-		// お気に入りボタン
-		let buttonContent = generateTagFromObject(UUJ.ADD_PARTS.FavoriteMark);
-		// 非表示ボタン
-		buttonContent += generateTagFromObject(UUJ.ADD_PARTS.DisableButton);
-		// ボタンを挿入
-		$('td.name > a').after(buttonContent);
-
-		// その他の情報開閉トグルボタンを挿入
-		$('#loadBack2').parent().after('<br><input type="button" id="' + UUJ.ADD_PARTS.OtherToggleButton.id + '" value="' + UUJ.ADD_PARTS.OtherToggleButton.closeLabel + '">');
-		// その他の情報をまとめる
-		$(UUJ.ADD_PARTS.OtherToggleButton.getSelecter()).nextAll().wrapAll('<div id="otherToggle" />');
-
-		// ボタン用CSS
-		let addCSS =
-			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ', ' + UUJ.ADD_PARTS.DisableButton.getSelecter() + ', ' + UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ' {cursor: pointer; margin: 2px; font-weight: bold;} ' +
-			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ' {color:' + UUJ.COLORS.UNFAVORITE_MARK + ';} ' +
-			UUJ.ADD_PARTS.DisableButton.getSelecter() + ' {color: ' + UUJ.COLORS.UNDISABLE_MARK + ';} ' +
-			UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ' {color: ' + UUJ.COLORS.FAVORITE_MARK + ';} ' +
-			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ':hover, ' + UUJ.ADD_PARTS.DisableButton.getSelecter() + ':hover, ' + UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ':hover {font-size: 30px;} ' +
-			UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ':hover {color:' + UUJ.COLORS.FAVORITE_MARK + ' !important;} ' +
-			UUJ.ADD_PARTS.DisableButton.getSelecter() + ':hover {color:' + UUJ.COLORS.DISABLE_MARK + ' !important;} ' +
-			UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ':hover {color:' + UUJ.COLORS.UNFAVORITE_MARK + ' !important;}';
-
-		// ボタン装飾用CSS
-		addCSS +=
-			'.button {cursor: pointer; width: 100px; margin: 2px 2px 2px auto; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
-			'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
-			'.button:active {top: 3px; box-shadow: none;}';
-
-		/////////////////////////////
-		// テーブル用CSS
-		/////////////////////////////
-
-		addCSS += 'tr.favorite > td {background-color: ' + UUJ.COLORS.FAVORITE_ROW + ' !important;}';
-
-		/////////////////////////////
-		// モーダルウィンドウ
-		/////////////////////////////
-
-		// モーダルウィンドウボタンを挿入
-		$('#topMenuBar > ul').append('<li><a data-target="wm" id="' + UUJ.ADD_PARTS.ModalOpenButton.id + '" style="cursor: pointer;">' + UUJ.ADD_PARTS.ModalOpenButton.value + '</a></li>');
-		// モーダルウィンドウ本体を挿入
-		$('body').append('<div id="mw" class="' + UUJ.MODAL_WINDOW.class + '"></div>');
-
-		// タイトル
-		let mwContent = '<h2>拡張スクリプト設定 &lt; ' + GM.info.script.name + ' version ' + GM.info.script.version + ' &gt;</h2>';
-
-		// 左メニュー
-		mwContent += '<div class="' + UUJ.MODAL_WINDOW.leftMenu.class + '"><ul>';
-		Object.keys(UUJ.MODAL_WINDOW.leftMenu).forEach(function(key) {
-			if (typeof this[key] === 'object') {
-				mwContent += '<li class="' + this[key].class + '" id="' + this[key].id + '">' + this[key].value + '</li>';
+			} else if (o === 'class' && this.class !== undefined) {
+				return '.' + this.class;
+			} else if (o === 'id' && this.id !== undefined) {
+				return '#' + this.id;
+			} else {
+				return undefined;
 			}
-		}, UUJ.MODAL_WINDOW.leftMenu);
-		mwContent += '</ul></div>';
+		},
+	});
 
-		// 右ペイン
-		mwContent += '<div class="' + UUJ.MODAL_WINDOW.rightPane.class + '">';
-		Object.keys(UUJ.MODAL_WINDOW.rightPane).forEach(function(key) {
-			if (typeof this[key] === 'object') {
-				mwContent += '<div class="' + this[key].class + '" id="' + this[key].id + '">';
-				Object.keys(this[key]).forEach(function(key) {
-					if (typeof this[key] === 'object') {
-						if (this[key].type !== undefined) {
-							mwContent += generateTagFromObject(this[key]);
-						} else {
-							mwContent += '<div class="' + this[key].class + '">';
-							Object.keys(this[key]).forEach(function(key) {
-								if (typeof this[key] === 'object') {
-									if (this[key].type !== undefined) {
-										mwContent += generateTagFromObject(this[key]);
-									} else {
-										mwContent += '<div class="' + this[key].class + '">';
-										Object.keys(this[key]).forEach(function(key) {
-											if (typeof this[key] === 'object') {
-												mwContent += '<div id="' + this[key].id + '">';
-												Object.keys(this[key]).forEach(function(key) {
-													if (typeof this[key] === 'object') {
-														mwContent += generateTagFromObject(this[key]);
-													}
-												}, this[key]);
-												mwContent += '</div>';
-											}
-										}, this[key]);
-										mwContent += '</div>';
-									}
-								}
-							}, this[key]);
-							mwContent += '</div>';
-						}
-					}
-				}, this[key]);
-				mwContent += '</div>';
-			}
-		}, UUJ.MODAL_WINDOW.rightPane);
-		mwContent += '</div>';
-		// 閉じるボタン
-		mwContent += generateTagFromObject(UUJ.ADD_PARTS.ModalCloseButton);
-		// 挿入
-		$(UUJ.MODAL_WINDOW.getSelecter()).append(mwContent);
+	debug();
 
-		// modal-window用CSS
-		addCSS += UUJ.MODAL_WINDOW.getSelecter() + ' {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff; border-spacing: 2px 0px;}' +
-			'.modal-item, ' + UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.thumbnail.size.getSelecter() + ' {border: medium solid #CCC; padding: 10px; margin: 10px; border-collapse: separate;}' +
-			// 左メニュー
-			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' {display: table-cell; width: 190px;}' +
-			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' ul {list-style-type: none; padding: 10px 0px 10px 5px;}' +
-			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li {border: 1px solid #9F99A3; background-color: #EEEEEE; padding: 3px 10px; text-decoration: none; color: #333; width: 150px; margin: 2px 0px; text-align: left; font-size: 18px; cursor: pointer;}' +
-			UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li:hover {border: 1px solid #8593A9; background-color: #9EB7DD;}' +
-			'.selected-menu {background-color: #FFF6CA !important;}' +
-			// 右メニュー
-			UUJ.MODAL_WINDOW.rightPane.getSelecter() + ' {display: table-cell; width: inherit;}' +
-			UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.getSelecter() + ' {display: table-cell; width: 260px; text-align: center; vertical-align: middle; border: medium solid #CCC; padding: 10px;}' +
-			UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.getSelecter() + ' > * {margin: 2px;}' +
-			UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.item.getSelecter() + ' {background: #CCC;}' +
-			'input[type=number] {text-align: right;}';
+	/////////////////////////////
+	// 追加するボタンの処理
+	/////////////////////////////
 
-		// modal-overlay用CSS
-		addCSS += UUJ.ADD_PARTS.ModalOverlay.getSelecter() + ' {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}';
+	// お気に入りボタン
+	let buttonContent = generateTagFromObject(UUJ.ADD_PARTS.FavoriteMark);
+	// 非表示ボタン
+	buttonContent += generateTagFromObject(UUJ.ADD_PARTS.DisableButton);
+	// ボタンを挿入
+	$('td.name > a').after(buttonContent);
 
-		// CSSをまとめて設定
-		addStyle(addCSS);
+	// その他の情報開閉トグルボタンを挿入
+	$('#loadBack2').parent().after('<br><input type="button" id="' + UUJ.ADD_PARTS.OtherToggleButton.id + '" value="' + UUJ.ADD_PARTS.OtherToggleButton.closeLabel + '">');
+	// その他の情報をまとめる
+	$(UUJ.ADD_PARTS.OtherToggleButton.getSelecter()).nextAll().wrapAll('<div id="otherToggle" />');
 
-		loadConfig().then().then(() => main());
+	// ボタン用CSS
+	let addCSS =
+		UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ', ' + UUJ.ADD_PARTS.DisableButton.getSelecter() + ', ' + UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ' {cursor: pointer; margin: 2px; font-weight: bold;} ' +
+		UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ' {color:' + UUJ.COLORS.UNFAVORITE_MARK + ';} ' +
+		UUJ.ADD_PARTS.DisableButton.getSelecter() + ' {color: ' + UUJ.COLORS.UNDISABLE_MARK + ';} ' +
+		UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ' {color: ' + UUJ.COLORS.FAVORITE_MARK + ';} ' +
+		UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ':hover, ' + UUJ.ADD_PARTS.DisableButton.getSelecter() + ':hover, ' + UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ':hover {font-size: 30px;} ' +
+		UUJ.ADD_PARTS.FavoriteMark.getSelecter() + ':hover {color:' + UUJ.COLORS.FAVORITE_MARK + ' !important;} ' +
+		UUJ.ADD_PARTS.DisableButton.getSelecter() + ':hover {color:' + UUJ.COLORS.DISABLE_MARK + ' !important;} ' +
+		UUJ.ADD_PARTS.FavoritedMark.getSelecter() + ':hover {color:' + UUJ.COLORS.UNFAVORITE_MARK + ' !important;}';
 
-		/**
-		 *  main
-		 */
-		function main() {
-			/////////////////////////////
-			// 設定の反映
-			/////////////////////////////
+	// ボタン装飾用CSS
+	addCSS +=
+		'.button {cursor: pointer; width: 100px; margin: 2px 2px 2px auto; position: relative; background-color: #1abc9c; border-radius: 8px; color: #fff; line-height: 28px; -webkit-transition: none; transition: none; box-shadow: 0 3px 0 #0e8c73; text-shadow: 0 1px 1px rgba(0, 0, 0, .3);}' +
+		'.button:hover {background-color: #52bca7; box-shadow: 0 3px 0 #23a188;}' +
+		'.button:active {top: 3px; box-shadow: none;}';
 
-			// 非表示セクションの反映
-			updateDisableSection();
+	/////////////////////////////
+	// テーブル用CSS
+	/////////////////////////////
 
-			// リスト適用
-			$('td.name > a[href]').each(function() {
-				// 非表示リストの反映
-				let name = $(this).text().replace(/\r?\n/g, '');
-				if ($.inArray(name, getDisableList()) != -1) {
-					deleteRow(this);
-				}
+	addCSS += 'tr.favorite > td {background-color: ' + UUJ.COLORS.FAVORITE_ROW + ' !important;}';
 
-				// お気に入りリストの反映
-				if ($.inArray(name, getFavoriteList()) >= 0) {
-					// ★の色変更
-					$(this).next().removeClass(UUJ.ADD_PARTS.FavoriteMark.class).addClass(UUJ.ADD_PARTS.FavoritedMark.class);
-					// お気に入りへ移動
-					moveFavoriteRow($(this).parent().parent());
-				}
-			});
+	/////////////////////////////
+	// モーダルウィンドウ
+	/////////////////////////////
 
-			// テーブルソートの反映
-			updateTableOrder();
+	// モーダルウィンドウボタンを挿入
+	$('#topMenuBar > ul').append('<li><a data-target="wm" id="' + UUJ.ADD_PARTS.ModalOpenButton.id + '" style="cursor: pointer;">' + UUJ.ADD_PARTS.ModalOpenButton.value + '</a></li>');
+	// モーダルウィンドウ本体を挿入
+	$('body').append('<div id="mw" class="' + UUJ.MODAL_WINDOW.class + '"></div>');
 
-			// サムネイル表示の反映
-			updateThumbnailSetting();
+	// タイトル
+	let mwContent = '<h2>拡張スクリプト設定 &lt; ' + GM.info.script.name + ' version ' + GM.info.script.version + ' &gt;</h2>';
 
-			// その他の設定を反映
-			updateMiscSetting();
+	// 左メニュー
+	mwContent += '<div class="' + UUJ.MODAL_WINDOW.leftMenu.class + '"><ul>';
+	Object.keys(UUJ.MODAL_WINDOW.leftMenu).forEach(function(key) {
+		if (typeof this[key] === 'object') {
+			mwContent += '<li class="' + this[key].class + '" id="' + this[key].id + '">' + this[key].value + '</li>';
+		}
+	}, UUJ.MODAL_WINDOW.leftMenu);
+	mwContent += '</ul></div>';
 
-			/////////////////////////////
-			// ボタンイベント
-			/////////////////////////////
-
-			// 非表示ボタン
-			$(UUJ.ADD_PARTS.DisableButton.getSelecter()).on('click', function() {
-				let name = nameFromDisableButton($(this));
-
-				if (confirm('[' + name + ']を非表示にしますか？')) {
-					// OK
-					addDisableList(name);
-					deleteRow(this);
-				} else {
-					// cancel
-					//console.log('canceled add disable list');
-				}
-			});
-
-			// お気に入りボタン
-			$(document).on('click', UUJ.ADD_PARTS.FavoriteMark.getSelecter(), function() {
-				let name = nameFromDisableButton($(this));
-				if (confirm('[' + name + ']をお気に入りに追加しますか？')) {
-					// リストに追加
-					addFavoriteList(name);
-					// クラス変更
-					$(this).removeClass(UUJ.ADD_PARTS.FavoriteMark.class).addClass(UUJ.ADD_PARTS.FavoritedMark.class);
-					// お気に入りへ移動
-					moveFavoriteRow($(this).parent().parent());
-				}
-			});
-			// お気に入り解除ボタン
-			$(document).on('click', UUJ.ADD_PARTS.FavoritedMark.getSelecter(), function() {
-				let name = nameFromDisableButton($(this));
-				if (confirm('[' + name + ']をお気に入りから削除しますか？')) {
-					let index = $.inArray(name, getFavoriteList());
-					// リストから削除
-					removeFavoriteList(index);
-					// クラス変更
-					$(this).removeClass(UUJ.ADD_PARTS.FavoritedMark.class).addClass(UUJ.ADD_PARTS.FavoriteMark.class);
-					// お気に入り外へ移動
-					removeFavoriteRow($(this).parent().parent());
-				}
-			});
-
-			// その他欄の非表示トグルボタン
-			$(UUJ.ADD_PARTS.OtherToggleButton.getSelecter()).on('click', function() {
-				toggleSection(UUJ.DB_NAMES.OTHER);
-			});
-
-			/////////////////////////////
-			// モーダルウィンドウイベント
-			/////////////////////////////
-
-			// 「.modal-open」をクリック
-			$(UUJ.ADD_PARTS.ModalOpenButton.getSelecter()).on('click', function() {
-				// 重複を防ぐ
-				if ($('div').hasClass(UUJ.ADD_PARTS.ModalOverlay.class)) {
-					$(UUJ.ADD_PARTS.ModalOverlay.getSelecter()).trigger('click');
-					return;
-				}
-
-				// オーバーレイ用の要素を追加
-				$('body').append('<div class="' + UUJ.ADD_PARTS.ModalOverlay.class + '"></div>');
-				// モーダルコンテンツのIDを取得
-				let modal = $('#mw');
-				let modalOverlay = $(UUJ.ADD_PARTS.ModalOverlay.getSelecter());
-				// オーバーレイをフェードイン
-				modalOverlay.fadeIn('slow');
-				// モーダルコンテンツの表示位置を設定
-				modalResize();
-				// モーダルコンテンツフェードイン
-				modal.fadeIn('slow');
-
-				/////////////////////////////
-				// 左メニュー処理
-				/////////////////////////////
-
-				// 左メニューのデフォルト
-				if (!$(UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li').hasClass('selected-menu')) {
-					$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecter('id')).addClass('selected-menu');
-				}
-
-				// 左メニューをクリックで右ペインを変更
-				$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecter('class')).on('click', function() {
-					// クラス切替
-					$('.selected-menu').removeClass('selected-menu');
-					$(this).addClass('selected-menu');
-
-					// 右ペインの変更
-					let id = $(this).attr('id');
-					if (id === UUJ.MODAL_WINDOW.leftMenu.menuAll.id) {
-						$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters()).toggle(true);
+	// 右ペイン
+	mwContent += '<div class="' + UUJ.MODAL_WINDOW.rightPane.class + '">';
+	Object.keys(UUJ.MODAL_WINDOW.rightPane).forEach(function(key) {
+		if (typeof this[key] === 'object') {
+			mwContent += '<div class="' + this[key].class + '" id="' + this[key].id + '">';
+			Object.keys(this[key]).forEach(function(key) {
+				if (typeof this[key] === 'object') {
+					if (this[key].type !== undefined) {
+						mwContent += generateTagFromObject(this[key]);
 					} else {
-						$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters()).toggle(false);
-						$(UUJ.MODAL_WINDOW.leftMenu[id].getSelecters()).toggle(true);
-					}
-				});
-
-				/////////////////////////////
-				// モーダルウィンドウに設定内容を表示
-				/////////////////////////////
-
-				// 非表示リストの中身を表示
-				$(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val(getDisableList());
-				// 非表示セクションのチェックボックスを反映
-				$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.firstList.getSelecter('class')).each(function() {
-					if (getDisableSection()[$(this).attr('id')]) {
-						// チェックあり
-						$(this).prop('checked', true);
-					} else {
-						// チェックなし
-						$(this).prop('checked', false);
-					}
-				});
-				// お気に入りリストの中身を表示
-				$(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val(getFavoriteList());
-
-				// その他の設定を表示
-				Object.keys(UUJ.MODAL_WINDOW.rightPane.misc).forEach(function(key) {
-					if (typeof this[key] === 'object' && key !== 'title') {
+						mwContent += '<div class="' + this[key].class + '">';
 						Object.keys(this[key]).forEach(function(key) {
-							if (typeof this[key] === 'object' && key !== 'title') {
-								$(this[key].getSelecter('id')).prop('checked', getMiscSetting()[key]);
+							if (typeof this[key] === 'object') {
+								if (this[key].type !== undefined) {
+									mwContent += generateTagFromObject(this[key]);
+								} else {
+									mwContent += '<div class="' + this[key].class + '">';
+									Object.keys(this[key]).forEach(function(key) {
+										if (typeof this[key] === 'object') {
+											mwContent += '<div id="' + this[key].id + '">';
+											Object.keys(this[key]).forEach(function(key) {
+												if (typeof this[key] === 'object') {
+													mwContent += generateTagFromObject(this[key]);
+												}
+											}, this[key]);
+											mwContent += '</div>';
+										}
+									}, this[key]);
+									mwContent += '</div>';
+								}
 							}
 						}, this[key]);
+						mwContent += '</div>';
 					}
-				}, UUJ.MODAL_WINDOW.rightPane.misc);
+				}
+			}, this[key]);
+			mwContent += '</div>';
+		}
+	}, UUJ.MODAL_WINDOW.rightPane);
+	mwContent += '</div>';
+	// 閉じるボタン
+	mwContent += generateTagFromObject(UUJ.ADD_PARTS.ModalCloseButton);
+	// 挿入
+	$(UUJ.MODAL_WINDOW.getSelecter()).append(mwContent);
 
-				/////////////////////////////
-				// 設定ウィンドウ内の初期化ボタン
-				/////////////////////////////
+	// modal-window用CSS
+	addCSS += UUJ.MODAL_WINDOW.getSelecter() + ' {position: absolute; overflow: auto; display: none; z-index: 100; width: 75%; margin: 0; padding: 10px 20px; border: 2px solid #aaa; background: #fff; border-spacing: 2px 0px;}' +
+		'.modal-item, ' + UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.getSelecter() + ', ' + UUJ.MODAL_WINDOW.rightPane.thumbnail.size.getSelecter() + ' {border: medium solid #CCC; padding: 10px; margin: 10px; border-collapse: separate;}' +
+		// 左メニュー
+		UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' {display: table-cell; width: 190px;}' +
+		UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' ul {list-style-type: none; padding: 10px 0px 10px 5px;}' +
+		UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li {border: 1px solid #9F99A3; background-color: #EEEEEE; padding: 3px 10px; text-decoration: none; color: #333; width: 150px; margin: 2px 0px; text-align: left; font-size: 18px; cursor: pointer;}' +
+		UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li:hover {border: 1px solid #8593A9; background-color: #9EB7DD;}' +
+		'.selected-menu {background-color: #FFF6CA !important;}' +
+		// 右メニュー
+		UUJ.MODAL_WINDOW.rightPane.getSelecter() + ' {display: table-cell; width: inherit;}' +
+		UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.getSelecter() + ' {display: table-cell; width: 260px; text-align: center; vertical-align: middle; border: medium solid #CCC; padding: 10px;}' +
+		UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.getSelecter() + ' > * {margin: 2px;}' +
+		UUJ.MODAL_WINDOW.rightPane.thumbnail.size.sampleImage.item.getSelecter() + ' {background: #CCC;}' +
+		'input[type=number] {text-align: right;}';
 
-				// お気に入りリストを初期化
-				$(UUJ.MODAL_WINDOW.rightPane.favoriteList.initializeButton.getSelecter('id')).on('click', function() {
-					initializeFavoriteListDB();
-					$(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val(getFavoriteList());
-				});
-				// 非表示リストを初期化ボタン
-				$(UUJ.MODAL_WINDOW.rightPane.disableList.initializeButton.getSelecter('id')).on('click', function() {
-					initializeDisableListDB();
-					$(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val(getDisableList());
-				});
+	// modal-overlay用CSS
+	addCSS += UUJ.ADD_PARTS.ModalOverlay.getSelecter() + ' {z-index: 99; display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75);}';
 
-				/////////////////////////////
-				// 設定ウィンドウ内の保存ボタン
-				/////////////////////////////
+	// CSSをまとめて設定
+	addStyle(addCSS);
 
-				// お気に入りリストを保存ボタン
-				$(UUJ.MODAL_WINDOW.rightPane.favoriteList.saveButton.getSelecter('id')).on('click', function() {
-					if (confirm('お気に入りリストを保存しますか？')) {
-						// OK
-						let flist = $(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val().split(',');
-						setFavoriteList(flist);
-					}
-				});
-				// 非表示リストを保存ボタン
-				$(UUJ.MODAL_WINDOW.rightPane.disableList.saveButton.getSelecter('id')).on('click', function() {
-					if (confirm('非表示リストを保存しますか？')) {
-						// OK
-						let dlist = $(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val().split(',');
-						setDisableList(dlist);
-					}
-				});
+	loadConfig().then().then(() => main());
 
-				/////////////////////////////
-				// 設定ウィンドウ内のチェックボックス
-				/////////////////////////////
+	/**
+	 *  main
+	 */
+	function main() {
+		/////////////////////////////
+		// 設定の反映
+		/////////////////////////////
 
-				// 非表示セクションのチェックボックス
-				$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.firstList.getSelecter('class')).on('change', function() {
-					setDisableSection($(this).attr('id'), $(this).is(':checked'));
-				});
-				// サムネイルサイズアスペクト比保持
-				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.keepAspect.item.getSelecter('id')).on('change', function() {
-					let ts = getThumbnailSetting();
+		// 非表示セクションの反映
+		updateDisableSection();
 
-					ts.keepAspect = $(this).prop('checked');
+		// リスト適用
+		$('td.name > a[href]').each(function() {
+			// 非表示リストの反映
+			let name = $(this).text().replace(/\r?\n/g, '');
+			if ($.inArray(name, getDisableList()) != -1) {
+				deleteRow(this);
+			}
 
-					setThumbnailSetting(ts);
-				});
+			// お気に入りリストの反映
+			if ($.inArray(name, getFavoriteList()) >= 0) {
+				// ★の色変更
+				$(this).next().removeClass(UUJ.ADD_PARTS.FavoriteMark.class).addClass(UUJ.ADD_PARTS.FavoritedMark.class);
+				// お気に入りへ移動
+				moveFavoriteRow($(this).parent().parent());
+			}
+		});
 
-				/////////////////////////////
-				// 設定ウィンドウ内のラジオボックス
-				/////////////////////////////
+		// テーブルソートの反映
+		updateTableOrder();
 
-				// テーブル並び替え切り替え
-				$(UUJ.MODAL_WINDOW.rightPane.tableOrder.default.getSelecter('class')).on('change', function() {
-					setTableOrder(UUJ.MODAL_WINDOW.rightPane.tableOrder[$(this).attr('id')].replace(/OrderRadio$/g, '').tableOrder);
-				});
-				// サムネイルモード切替
-				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.getSelecter('class')).on('change', function() {
-					let ts = getThumbnailSetting();
-					let mode = lowerCaseFirst($(this).attr('id').replace(/^thumbnail/g, ''));
+		// サムネイル表示の反映
+		updateThumbnailSetting();
 
-					ts.mode = UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[mode].mode;
+		// その他の設定を反映
+		updateMiscSetting();
 
-					setThumbnailSetting(ts);
-				});
+		/////////////////////////////
+		// ボタンイベント
+		/////////////////////////////
 
-				/////////////////////////////
-				// 設定ウィンドウ内の数字ボックス
-				/////////////////////////////
+		// 非表示ボタン
+		$(UUJ.ADD_PARTS.DisableButton.getSelecter()).on('click', function() {
+			let name = nameFromDisableButton($(this));
 
-				// サムネイルサイズ変更
-				$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('class')).on('change', function() {
-					let ts = getThumbnailSetting();
-					ts.width = Number($(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('id')).val());
-					ts.height = Number($(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.height.item.getSelecter('id')).val());
+			if (confirm('[' + name + ']を非表示にしますか？')) {
+				// OK
+				addDisableList(name);
+				deleteRow(this);
+			} else {
+				// cancel
+				//console.log('canceled add disable list');
+			}
+		});
 
-					setThumbnailSetting(ts);
-				});
+		// お気に入りボタン
+		$(document).on('click', UUJ.ADD_PARTS.FavoriteMark.getSelecter(), function() {
+			let name = nameFromDisableButton($(this));
+			if (confirm('[' + name + ']をお気に入りに追加しますか？')) {
+				// リストに追加
+				addFavoriteList(name);
+				// クラス変更
+				$(this).removeClass(UUJ.ADD_PARTS.FavoriteMark.class).addClass(UUJ.ADD_PARTS.FavoritedMark.class);
+				// お気に入りへ移動
+				moveFavoriteRow($(this).parent().parent());
+			}
+		});
+		// お気に入り解除ボタン
+		$(document).on('click', UUJ.ADD_PARTS.FavoritedMark.getSelecter(), function() {
+			let name = nameFromDisableButton($(this));
+			if (confirm('[' + name + ']をお気に入りから削除しますか？')) {
+				let index = $.inArray(name, getFavoriteList());
+				// リストから削除
+				removeFavoriteList(index);
+				// クラス変更
+				$(this).removeClass(UUJ.ADD_PARTS.FavoritedMark.class).addClass(UUJ.ADD_PARTS.FavoriteMark.class);
+				// お気に入り外へ移動
+				removeFavoriteRow($(this).parent().parent());
+			}
+		});
 
-				// その他の設定のチェックボックス
-				$(UUJ.MODAL_WINDOW.rightPane.misc.getItemClass()).on('change', function() {
-					let ms = getMiscSetting();
-					ms[$(this).attr('id')] = !ms[$(this).attr('id')];
-					setMiscSetting(ms);
-				});
+		// その他欄の非表示トグルボタン
+		$(UUJ.ADD_PARTS.OtherToggleButton.getSelecter()).on('click', function() {
+			toggleSection(UUJ.DB_NAMES.OTHER);
+		});
 
-				/////////////////////////////
-				// モーダルウィンドウの処理
-				/////////////////////////////
+		/////////////////////////////
+		// モーダルウィンドウイベント
+		/////////////////////////////
 
-				// 「.modal-overlay」あるいは「.modal-close」をクリック
-				$(UUJ.ADD_PARTS.ModalOverlay.getSelecter() + ', #modal-close').off().on('click', function() {
-					// モーダルコンテンツとオーバーレイをフェードアウト
-					modal.fadeOut('slow');
-					modalOverlay.fadeOut('slow', function() {
-						// オーバーレイを削除
-						modalOverlay.remove();
-					});
-				});
+		// 「.modal-open」をクリック
+		$(UUJ.ADD_PARTS.ModalOpenButton.getSelecter()).on('click', function() {
+			// 重複を防ぐ
+			if ($('div').hasClass(UUJ.ADD_PARTS.ModalOverlay.class)) {
+				$(UUJ.ADD_PARTS.ModalOverlay.getSelecter()).trigger('click');
+				return;
+			}
 
-				// リサイズしたら表示位置を再設定
-				$(window).on('resize', function() {
-					modalResize();
-				});
+			// オーバーレイ用の要素を追加
+			$('body').append('<div class="' + UUJ.ADD_PARTS.ModalOverlay.class + '"></div>');
+			// モーダルコンテンツのIDを取得
+			let modal = $('#mw');
+			let modalOverlay = $(UUJ.ADD_PARTS.ModalOverlay.getSelecter());
+			// オーバーレイをフェードイン
+			modalOverlay.fadeIn('slow');
+			// モーダルコンテンツの表示位置を設定
+			modalResize();
+			// モーダルコンテンツフェードイン
+			modal.fadeIn('slow');
 
-				/**
-				 * モーダルコンテンツの表示位置を設定する関数
-				 */
-				function modalResize() {
-					// モーダルコンテンツの表示位置を取得
-					let x = ($(window).width() - modal.outerWidth(true)) / 2;
-					let y = 50; //($(window).height() - modal.outerHeight(true)) / 2;
-					let width = $(window).width() * 0.75;
+			/////////////////////////////
+			// 左メニュー処理
+			/////////////////////////////
 
-					// モーダルコンテンツの表示位置を設定
-					modal.css({
-						'left': x + 'px',
-						'top': y + 'px',
-						'width': width + 'px',
-					});
+			// 左メニューのデフォルト
+			if (!$(UUJ.MODAL_WINDOW.leftMenu.getSelecter() + ' li').hasClass('selected-menu')) {
+				$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecter('id')).addClass('selected-menu');
+			}
+
+			// 左メニューをクリックで右ペインを変更
+			$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecter('class')).on('click', function() {
+				// クラス切替
+				$('.selected-menu').removeClass('selected-menu');
+				$(this).addClass('selected-menu');
+
+				// 右ペインの変更
+				let id = $(this).attr('id');
+				if (id === UUJ.MODAL_WINDOW.leftMenu.menuAll.id) {
+					$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters()).toggle(true);
+				} else {
+					$(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters()).toggle(false);
+					$(UUJ.MODAL_WINDOW.leftMenu[id].getSelecters()).toggle(true);
 				}
 			});
-		}
-	});
+
+			/////////////////////////////
+			// モーダルウィンドウに設定内容を表示
+			/////////////////////////////
+
+			// 非表示リストの中身を表示
+			$(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val(getDisableList());
+			// 非表示セクションのチェックボックスを反映
+			$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.firstList.getSelecter('class')).each(function() {
+				if (getDisableSection()[$(this).attr('id')]) {
+					// チェックあり
+					$(this).prop('checked', true);
+				} else {
+					// チェックなし
+					$(this).prop('checked', false);
+				}
+			});
+			// お気に入りリストの中身を表示
+			$(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val(getFavoriteList());
+
+			// その他の設定を表示
+			Object.keys(UUJ.MODAL_WINDOW.rightPane.misc).forEach(function(key) {
+				if (typeof this[key] === 'object' && key !== 'title') {
+					Object.keys(this[key]).forEach(function(key) {
+						if (typeof this[key] === 'object' && key !== 'title') {
+							$(this[key].getSelecter('id')).prop('checked', getMiscSetting()[key]);
+						}
+					}, this[key]);
+				}
+			}, UUJ.MODAL_WINDOW.rightPane.misc);
+
+			/////////////////////////////
+			// 設定ウィンドウ内の初期化ボタン
+			/////////////////////////////
+
+			// お気に入りリストを初期化
+			$(UUJ.MODAL_WINDOW.rightPane.favoriteList.initializeButton.getSelecter('id')).on('click', function() {
+				initializeFavoriteListDB();
+				$(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val(getFavoriteList());
+			});
+			// 非表示リストを初期化ボタン
+			$(UUJ.MODAL_WINDOW.rightPane.disableList.initializeButton.getSelecter('id')).on('click', function() {
+				initializeDisableListDB();
+				$(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val(getDisableList());
+			});
+
+			/////////////////////////////
+			// 設定ウィンドウ内の保存ボタン
+			/////////////////////////////
+
+			// お気に入りリストを保存ボタン
+			$(UUJ.MODAL_WINDOW.rightPane.favoriteList.saveButton.getSelecter('id')).on('click', function() {
+				if (confirm('お気に入りリストを保存しますか？')) {
+					// OK
+					let flist = $(UUJ.MODAL_WINDOW.rightPane.favoriteList.textarea.getSelecter()).val().split(',');
+					setFavoriteList(flist);
+				}
+			});
+			// 非表示リストを保存ボタン
+			$(UUJ.MODAL_WINDOW.rightPane.disableList.saveButton.getSelecter('id')).on('click', function() {
+				if (confirm('非表示リストを保存しますか？')) {
+					// OK
+					let dlist = $(UUJ.MODAL_WINDOW.rightPane.disableList.textarea.getSelecter()).val().split(',');
+					setDisableList(dlist);
+				}
+			});
+
+			/////////////////////////////
+			// 設定ウィンドウ内のチェックボックス
+			/////////////////////////////
+
+			// 非表示セクションのチェックボックス
+			$(UUJ.MODAL_WINDOW.rightPane.disableSection.sections.firstList.getSelecter('class')).on('change', function() {
+				setDisableSection($(this).attr('id'), $(this).is(':checked'));
+			});
+			// サムネイルサイズアスペクト比保持
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.keepAspect.item.getSelecter('id')).on('change', function() {
+				let ts = getThumbnailSetting();
+
+				ts.keepAspect = $(this).prop('checked');
+
+				setThumbnailSetting(ts);
+			});
+
+			/////////////////////////////
+			// 設定ウィンドウ内のラジオボックス
+			/////////////////////////////
+
+			// テーブル並び替え切り替え
+			$(UUJ.MODAL_WINDOW.rightPane.tableOrder.default.getSelecter('class')).on('change', function() {
+				setTableOrder(UUJ.MODAL_WINDOW.rightPane.tableOrder[$(this).attr('id')].replace(/OrderRadio$/g, '').tableOrder);
+			});
+			// サムネイルモード切替
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.mode.default.getSelecter('class')).on('change', function() {
+				let ts = getThumbnailSetting();
+				let mode = lowerCaseFirst($(this).attr('id').replace(/^thumbnail/g, ''));
+
+				ts.mode = UUJ.MODAL_WINDOW.rightPane.thumbnail.mode[mode].mode;
+
+				setThumbnailSetting(ts);
+			});
+
+			/////////////////////////////
+			// 設定ウィンドウ内の数字ボックス
+			/////////////////////////////
+
+			// サムネイルサイズ変更
+			$(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('class')).on('change', function() {
+				let ts = getThumbnailSetting();
+				ts.width = Number($(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.width.item.getSelecter('id')).val());
+				ts.height = Number($(UUJ.MODAL_WINDOW.rightPane.thumbnail.size.setting.height.item.getSelecter('id')).val());
+
+				setThumbnailSetting(ts);
+			});
+
+			// その他の設定のチェックボックス
+			$(UUJ.MODAL_WINDOW.rightPane.misc.getItemClass()).on('change', function() {
+				let ms = getMiscSetting();
+				ms[$(this).attr('id')] = !ms[$(this).attr('id')];
+				setMiscSetting(ms);
+			});
+
+			/////////////////////////////
+			// モーダルウィンドウの処理
+			/////////////////////////////
+
+			// 「.modal-overlay」あるいは「.modal-close」をクリック
+			$(UUJ.ADD_PARTS.ModalOverlay.getSelecter() + ', #modal-close').off().on('click', function() {
+				// モーダルコンテンツとオーバーレイをフェードアウト
+				modal.fadeOut('slow');
+				modalOverlay.fadeOut('slow', function() {
+					// オーバーレイを削除
+					modalOverlay.remove();
+				});
+			});
+
+			// リサイズしたら表示位置を再設定
+			$(window).on('resize', function() {
+				modalResize();
+			});
+
+			/**
+			 * モーダルコンテンツの表示位置を設定する関数
+			 */
+			function modalResize() {
+				// モーダルコンテンツの表示位置を取得
+				let x = ($(window).width() - modal.outerWidth(true)) / 2;
+				let y = 50; //($(window).height() - modal.outerHeight(true)) / 2;
+				let width = $(window).width() * 0.75;
+
+				// モーダルコンテンツの表示位置を設定
+				modal.css({
+					'left': x + 'px',
+					'top': y + 'px',
+					'width': width + 'px',
+				});
+			}
+		});
+	}
 
 	/////////////////////////////
 	// 非表示リスト
@@ -1851,6 +1845,6 @@
 	 * debug
 	 */
 	function debug() {
-		//console.log(UUJ.MODAL_WINDOW.leftMenu.menuAll.getSelecters());
+		// debug
 	}
 })();
